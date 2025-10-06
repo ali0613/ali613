@@ -6,7 +6,7 @@
 
 [rewrite_local]
 
-http:\/\/newtest\.zoooy111\.com\/mobilev2\.php\/User\/index url script-response-body https://gitee.com/ali613/ali613/raw/master/ztbl.js
+http:\/\/newtest\.zoooy111\.com\/mobilev2\.php\/User\/index url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/ztbl.js
 
 [mitm] 
 
