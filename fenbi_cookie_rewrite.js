@@ -4,8 +4,8 @@
  * 
  * 使用方法：
 [rewrite_local]
-^https?:\/\/ke\.fenbi\.com\/ url script-request-header fenbi_cookie_rewrite.js
-^https?:\/\/hera-webapp\.fenbi\.com\/iphone\/ url script-request-header fenbi_cookie_rewrite.js
+^https?:\/\/ke\.fenbi\.com\/ url script-request-header https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi_cookie_rewrite.js
+^https?:\/\/hera-webapp\.fenbi\.com\/iphone\/ url script-request-header https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi_cookie_rewrite.js
 
 [mitm]
 hostname = ke.fenbi.com, hera-webapp.fenbi.com
