@@ -1,15 +1,4 @@
 
- * Quantumult X 粉笔网Cookie重写脚本
- * 功能：自动替换请求中的Cookie，支持路径黑名单
- * 
- * 使用方法：
-[rewrite_local]
-^https?:\/\/ke\.fenbi\.com\/ url script-request-header https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi_cookie_rewrite.js
-^https?:\/\/hera-webapp\.fenbi\.com\/iphone\/ url script-request-header https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi_cookie_rewrite.js
-
-[mitm]
-hostname = ke.fenbi.com, hera-webapp.fenbi.com
-
 
 // ==================== 配置区域 ====================
 
