@@ -5,15 +5,15 @@
  * 2. 等待 mediafile/meta 接口原始响应后，用存储的cookie重新请求并替换响应
  * 
  * 使用方法：
- * [rewrite_local]
+ [rewrite_local]
  * # 响应重写 - 修改权限
- * ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/question_episodes_with_multi_type url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi666.js
+ ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/question_episodes_with_multi_type url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi666.js
  * 
  * # 响应重写 - 等待原始响应后，用新cookie重新请求并替换
- * ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/[^/]+\/mediafile\/meta url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi666.js
+ ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/[^/]+\/mediafile\/meta url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi666.js
  * 
- * [mitm]
- * hostname = ke.fenbi.com
+ [mitm]
+ hostname = ke.fenbi.com
  */
 
 // ==================== 配置区域 ====================
