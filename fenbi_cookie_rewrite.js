@@ -3,7 +3,6 @@
  * 功能：
  * 1. 修改 question_episodes_with_multi_type 接口响应，解锁权限
  * 2. 拦截 mediafile/meta 接口，使用存储的cookie重新请求
- * 
  * 使用方法：
  [rewrite_local]
  * # 响应重写 - 修改权限
@@ -11,7 +10,6 @@
  * 
  * # 请求重写 - 替换响应
  ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/[^/]+\/mediafile\/meta url script-request-header https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi_cookie_rewrite.js
- * 
  [mitm]
  hostname = ke.fenbi.com
  */
