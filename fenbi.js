@@ -2,15 +2,15 @@
  * Quantumult X 粉笔网权限重写脚本
  * 功能：
  * 1. 修改 question_episodes_with_multi_type 接口响应，解锁权限
- * 2. 拦截 mediafile/meta 接口，使用存储的cookie重新请求
+ * 2. 拦截 mediafile/meta 接口，使用存储的cookie重新请求并替换响应
  * 
  * 使用方法：
  * [rewrite_local]
  * # 响应重写 - 修改权限
  * ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/question_episodes_with_multi_type url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi.js
  * 
- * # 请求重写 - 替换响应
- * ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/[^/]+\/mediafile\/meta url script-request-header https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi.js
+ * # Echo响应 - 拦截并替换响应（使用 script-echo-response）
+ * ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/[^/]+\/mediafile\/meta url echo-response https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi.js
  * 
  * [mitm]
  * hostname = ke.fenbi.com
@@ -114,36 +114,31 @@ else if (url.match(/\/episodes\/[^/]+\/mediafile\/meta/)) {
                         : response.body;
                     console.log(`🔍 响应预览: ${preview}`);
                     
-                    if (response.statusCode === 200) {
-                        console.log(`✅ 成功替换原请求响应`);
-                        console.log(`========================================\n`);
-                        
-                        // 返回新的响应
-                        $done({
-                            response: {
-                                status: response.statusCode,
-                                headers: response.headers || {},
-                                body: response.body
-                            }
-                        });
-                    } else {
-                        console.log(`⚠️  状态码非200，但仍返回响应`);
-                        console.log(`========================================\n`);
-                        
-                        $done({
-                            response: {
-                                status: response.statusCode,
-                                headers: response.headers || {},
-                                body: response.body
-                            }
-                        });
-                    }
+                    console.log(`✅ 成功替换原请求响应`);
+                    console.log(`========================================\n`);
+                    
+                    // 对于 echo-response，返回格式需要包含 status、headers 和 body
+                    const echoResponse = {
+                        status: `HTTP/1.1 ${response.statusCode} OK`,
+                        headers: response.headers || {
+                            'Content-Type': 'application/json; charset=utf-8'
+                        },
+                        body: response.body
+                    };
+                    
+                    $done(echoResponse);
                 } else {
                     console.log(`❌ 响应体为空`);
                     console.log(`========================================\n`);
                     
-                    // 响应为空，继续原始请求
-                    $done({});
+                    // 响应为空，返回错误信息
+                    $done({
+                        status: 'HTTP/1.1 500 Internal Server Error',
+                        headers: {
+                            'Content-Type': 'application/json; charset=utf-8'
+                        },
+                        body: JSON.stringify({ error: '响应体为空' })
+                    });
                 }
             },
             reason => {
@@ -151,8 +146,17 @@ else if (url.match(/\/episodes\/[^/]+\/mediafile\/meta/)) {
                 console.log(`📝 失败原因: ${JSON.stringify(reason)}`);
                 console.log(`========================================\n`);
                 
-                // 请求失败，继续原始请求
-                $done({});
+                // 请求失败，返回错误信息
+                $done({
+                    status: 'HTTP/1.1 500 Internal Server Error',
+                    headers: {
+                        'Content-Type': 'application/json; charset=utf-8'
+                    },
+                    body: JSON.stringify({ 
+                        error: '请求失败',
+                        reason: String(reason)
+                    })
+                });
             }
         );
     }
