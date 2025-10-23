@@ -10,7 +10,7 @@
  * ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/question_episodes_with_multi_type url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi.js
  * 
  * # Echo响应 - 拦截并替换响应（使用 script-echo-response）
- * ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/[^/]+\/mediafile\/meta url echo-response https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi.js
+ * ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/[^/]+\/mediafile\/meta url script-echo-response https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi.js
  * 
  * [mitm]
  * hostname = ke.fenbi.com
