@@ -7,10 +7,10 @@
  * 使用方法：
  [rewrite_local]
  * # 响应重写 - 修改权限
- ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/question_episodes_with_multi_type url script-response-body fenbi_permission_rewrite.js
+ ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/question_episodes_with_multi_type url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi_cookie_rewrite.js
  * 
  * # 请求重写 - 替换响应
- ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/[^/]+\/mediafile\/meta url script-request-header fenbi_permission_rewrite.js
+ ^https?:\/\/ke\.fenbi\.com\/iphone\/gwy\/v3\/episodes\/[^/]+\/mediafile\/meta url script-request-header https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi_cookie_rewrite.js
  * 
  [mitm]
  hostname = ke.fenbi.com
