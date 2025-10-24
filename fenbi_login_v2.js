@@ -4,6 +4,9 @@
 [rewrite_local]
 // 或者直接使用script-request-header
 ^https:\/\/ke\.fenbi\.com\/iphone\/v3\/user_orders\/my url script-request-header https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi_login_v2.js
+
+[mitm]
+hostname = ke.fenbi.com
 */
 
 // fenbi-cookie.js
