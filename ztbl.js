@@ -6,12 +6,12 @@
 
 [rewrite_local]
 
-http:\/\/newtest\.zoooy111\.com\/mobilev2\.php\/User\/index url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/ztbl.js
+http:\/\/newtest\.zoooy111\.com\/mobilev4\.php\/User\/index url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/ztbl.js
 
 [mitm] 
 
 hostname = newtest.zoooy111.com,newtest.zoooy111.com
-mobilev2.php
+mobilev4.php
 
 
 
