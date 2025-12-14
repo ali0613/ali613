@@ -1,3 +1,4 @@
+/******************************
 [rewrite_local]
 
 ^https?:\/\/api\.rc-backup\.com\/.+\/(receipts$|subscribers\/?(.*?)*$) url script-response-body https://github.com/ali0613/ali613/raw/main/qlmb.js
