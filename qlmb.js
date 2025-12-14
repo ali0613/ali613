@@ -1,12 +1,11 @@
 [rewrite_local]
 
-^https?:\/\/api\.revenuecat\.com\/.+\/(receipts$|subscribers\/?(.*?)*$) url script-response-body https://raw.githubusercontent.com/89996462/Quantumult-X/main/ycdz/qlmB.js
+^https?:\/\/api\.rc-backup\.com\/.+\/(receipts$|subscribers\/?(.*?)*$) url script-response-body https://github.com/ali0613/ali613/raw/main/qlmb.js
 
-^https?:\/\/api\.revenuecat\.com\/.+\/(receipts$|subscribers\/?(.*?)*$) url script-request-header https://raw.githubusercontent.com/89996462/Quantumult-X/main/ycdz/qlmB.js
-
+^https?:\/\/api\.rc-backup\.com\/.+\/(receipts$|subscribers\/?(.*?)*$) url script-request-header https://github.com/ali0613/ali613/raw/main/qlmb.js
 [mitm] 
 
-hostname = api.revenuecat.com
+hostname = api.rc-backup.com
 
 *******************************/
 
