@@ -3,7 +3,7 @@
  * 
  * 适用于: QuantumultX
  * 功能: 解锁会员和金币视频，替换preview_video为source_origin完整链接
- * 加密算法: AES-CFB-256, NoPadding
+ * 加密算法: AES-128-CFB, NoPadding
  * 
  [rewrite_local]
  ^https:\/\/api\d*\.armbmmk\.xyz\/pwa\.php\/api\/MvDetail\/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/tangtoutiao_unlock.js
@@ -12,11 +12,11 @@
  hostname = api*.armbmmk.xyz
  */
 
-const AES_KEY_HEX = "7205a6c3883caf95b52db5b534e12ec3";
-const AES_IV_STR = "81d7beac44a86f43"; // 16字节IV作为字符串
+var AES_KEY_HEX = "7205a6c3883caf95b52db5b534e12ec3"; // 16字节 = 128位
+var AES_IV_STR = "81d7beac44a86f43"; // 16字节IV
 
 // S-Box
-const SBOX = [
+var SBOX = [
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
     0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
@@ -35,7 +35,7 @@ const SBOX = [
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
 ];
 
-const RCON = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36];
+var RCON = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36];
 
 // ==================== 工具函数 ====================
 
@@ -92,7 +92,7 @@ function bytesToStr(bytes) {
     return str;
 }
 
-// ==================== AES-256 实现 ====================
+// ==================== AES-128 实现 ====================
 
 function gmul(a, b) {
     var p = 0;
@@ -106,8 +106,9 @@ function gmul(a, b) {
     return p;
 }
 
-function keyExpansion(key) {
-    var Nk = 8, Nr = 14, Nb = 4;
+// AES-128 密钥扩展 (Nk=4, Nr=10)
+function keyExpansion128(key) {
+    var Nk = 4, Nr = 10, Nb = 4;
     var w = [];
     var i, j;
 
@@ -121,8 +122,6 @@ function keyExpansion(key) {
         if (i % Nk === 0) {
             temp = [SBOX[temp[1]], SBOX[temp[2]], SBOX[temp[3]], SBOX[temp[0]]];
             temp[0] ^= RCON[Math.floor(i / Nk) - 1];
-        } else if (Nk > 6 && i % Nk === 4) {
-            temp = [SBOX[temp[0]], SBOX[temp[1]], SBOX[temp[2]], SBOX[temp[3]]];
         }
 
         for (j = 0; j < 4; j++) {
@@ -133,12 +132,13 @@ function keyExpansion(key) {
     return w;
 }
 
-function aesEncryptBlock(input, expandedKey) {
-    var Nr = 14;
+// AES-128 单块加密 (Nr=10)
+function aesEncryptBlock128(input, expandedKey) {
+    var Nr = 10;
     var state = input.slice(0);
-    var i, j, round;
+    var i, round;
 
-    // AddRoundKey
+    // 初始轮密钥加
     for (i = 0; i < 16; i++) {
         state[i] ^= expandedKey[i];
     }
@@ -158,7 +158,7 @@ function aesEncryptBlock(input, expandedKey) {
 
         temp = state[15]; state[15] = state[11]; state[11] = state[7]; state[7] = state[3]; state[3] = temp;
 
-        // MixColumns (skip in last round)
+        // MixColumns (最后一轮跳过)
         if (round < Nr) {
             for (var c = 0; c < 4; c++) {
                 var col = c * 4;
@@ -179,27 +179,27 @@ function aesEncryptBlock(input, expandedKey) {
     return state;
 }
 
-// ==================== CFB 模式 ====================
+// ==================== CFB 模式 (AES-128) ====================
 
 function aesCfbDecrypt(hexData, keyHex, ivStr) {
     var key = hexToBytes(keyHex);
     var iv = strToBytes(ivStr);
     var data = hexToBytes(hexData);
-    var expandedKey = keyExpansion(key);
+    var expandedKey = keyExpansion128(key);
 
     var blockSize = 16;
     var result = [];
     var feedback = iv.slice(0);
 
     for (var i = 0; i < data.length; i += blockSize) {
-        var keystream = aesEncryptBlock(feedback, expandedKey);
+        var keystream = aesEncryptBlock128(feedback, expandedKey);
         var blockLen = Math.min(blockSize, data.length - i);
 
         for (var j = 0; j < blockLen; j++) {
             result.push(data[i + j] ^ keystream[j]);
         }
 
-        // 更新feedback
+        // 更新feedback为密文块
         feedback = [];
         for (var k = 0; k < blockSize; k++) {
             if (i + k < data.length) {
@@ -217,14 +217,14 @@ function aesCfbEncrypt(text, keyHex, ivStr) {
     var key = hexToBytes(keyHex);
     var iv = strToBytes(ivStr);
     var data = strToBytes(text);
-    var expandedKey = keyExpansion(key);
+    var expandedKey = keyExpansion128(key);
 
     var blockSize = 16;
     var result = [];
     var feedback = iv.slice(0);
 
     for (var i = 0; i < data.length; i += blockSize) {
-        var keystream = aesEncryptBlock(feedback, expandedKey);
+        var keystream = aesEncryptBlock128(feedback, expandedKey);
         var blockLen = Math.min(blockSize, data.length - i);
 
         var encBlock = [];
@@ -234,7 +234,7 @@ function aesCfbEncrypt(text, keyHex, ivStr) {
             encBlock.push(enc);
         }
 
-        // 更新feedback
+        // 更新feedback为密文块
         feedback = [];
         for (var k = 0; k < blockSize; k++) {
             if (k < encBlock.length) {
@@ -268,6 +268,20 @@ function unlockVideo(data) {
             info.is_gold = 0;
             info.gold = 0;
         }
+    }
+
+    // 直接处理顶层字段
+    if (data.source_origin) {
+        if (data.preview_video) {
+            data.preview_video = data.source_origin;
+            modified = true;
+        }
+        if (data.source) {
+            data.source = data.source_origin;
+        }
+        data.is_vip = 0;
+        data.is_gold = 0;
+        data.gold = 0;
     }
 
     // 处理列表
@@ -309,6 +323,9 @@ function main() {
             // 解密
             var decryptedStr = aesCfbDecrypt(obj.data, AES_KEY_HEX, AES_IV_STR);
             console.log("[汤头条解锁] 解密成功，数据长度: " + decryptedStr.length);
+
+            // 打印前100字符用于调试
+            console.log("[汤头条解锁] 数据预览: " + decryptedStr.substring(0, 100));
 
             var decryptedData = JSON.parse(decryptedStr);
 
