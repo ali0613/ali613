@@ -6,11 +6,11 @@
  * https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/tangtoutiao_unlock.js, tag=汤头条解锁, update-interval=86400, opt-parser=false, enabled=true
  * 
  * 或者本地引用：
- * [rewrite_local]
- * ^https://api3\.armbmmk\.xyz/pwa\.php/api/MvDetail/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/tangtoutiao_unlock.js
+ [rewrite_local]
+ ^https://api3\.armbmmk\.xyz/pwa\.php/api/MvDetail/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/tangtoutiao_unlock.js
  * 
- * [MITM]
- * hostname = api3.armbmmk.xyz
+ [MITM]
+ hostname = api3.armbmmk.xyz
  */
 
 // =============================================================================
