@@ -1,243 +1,74 @@
-// ==UserScript==
-// @name         汤头条视频解锁
-// @namespace    https://github.com/ali0613/ali613
-// @version      1.0.0
-// @description  解锁汤头条会员视频和金币视频
-// @author       Assistant
-// @match        https://api*.armbmmk.xyz/pwa.php/api/MvDetail/detail
-// @require      https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js
-// @grant        none
-// ==/UserScript==
-
 /**
  * 汤头条视频解锁脚本 for QuantumultX
  * 
  * 功能：解锁会员视频和金币视频
- * 原理：将 preview_video (试看链接) 替换为 source_origin (完整链接)
- * 
- * ===================== QuantumultX 配置 =====================
+ * 原理：通过动态加载 CryptoJS 库，将 preview_video (试看链接) 替换为 source_origin (完整链接)
  * 
  [rewrite_local]
  ^https://api\d*\.armbmmk\.xyz/pwa\.php/api/MvDetail/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/tangtoutiao_unlock.js
  * 
  [mitm]
  hostname = api*.armbmmk.xyz, *.armbmmk.xyz
- * 
- * ===================== 或使用远程订阅 =====================
- * 
- * 将以下内容保存为 tangtoutiao.conf 远程订阅：
- * 
- * [rewrite_local]
- * ^https://api\d*\.armbmmk\.xyz/pwa\.php/api/MvDetail/detail url script-response-body tangtoutiao_unlock.js
- * 
- * [mitm]
- * hostname = api*.armbmmk.xyz, *.armbmmk.xyz
- * 
- * ============================================================
  */
-
-// 动态加载 CryptoJS (如果 @require 不工作)
-if (typeof CryptoJS === 'undefined') {
-    console.log('[汤头条] CryptoJS 未加载，尝试动态引入...');
-
-    // 尝试从全局变量获取
-    if (typeof globalThis !== 'undefined' && globalThis.CryptoJS) {
-        var CryptoJS = globalThis.CryptoJS;
-        console.log('[汤头条] 从 globalThis 获取 CryptoJS');
-    } else if (typeof window !== 'undefined' && window.CryptoJS) {
-        var CryptoJS = window.CryptoJS;
-        console.log('[汤头条] 从 window 获取 CryptoJS');
-    } else if (typeof self !== 'undefined' && self.CryptoJS) {
-        var CryptoJS = self.CryptoJS;
-        console.log('[汤头条] 从 self 获取 CryptoJS');
-    } else {
-        console.log('[汤头条] 警告: 无法加载 CryptoJS，脚本可能无法正常工作');
-        console.log('[汤头条] 请确保：');
-        console.log('[汤头条] 1. 脚本顶部的 @require 指令有效');
-        console.log('[汤头条] 2. 或手动在 QuantumultX 中配置 CryptoJS 库');
-    }
-}
 
 // AES-CFB-256 加解密参数
 const AES_KEY_HEX = '7205a6c3883caf95b52db5b534e12ec3';
 const AES_IV_STR = '81d7beac44a86f43';
-
-/**
- * 十六进制字符串转字节数组
- */
-function hexToBytes(hex) {
-    const bytes = [];
-    for (let i = 0; i < hex.length; i += 2) {
-        bytes.push(parseInt(hex.substr(i, 2), 16));
-    }
-    return bytes;
-}
-
-/**
- * 字节数组转十六进制字符串
- */
-function bytesToHex(bytes) {
-    return bytes.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-}
-
-/**
- * 字符串转字节数组
- */
-function strToBytes(str) {
-    const encoder = new TextEncoder();
-    return Array.from(encoder.encode(str));
-}
-
-/**
- * 字节数组转字符串
- */
-function bytesToStr(bytes) {
-    const decoder = new TextDecoder('utf-8');
-    return decoder.decode(new Uint8Array(bytes));
-}
+const CRYPTO_JS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js';
 
 /**
  * AES-CFB-256 解密
- * 支持 QuantumultX 的多种加密库环境
  */
 function aesDecrypt(hexData) {
     try {
-        // 尝试使用 $crypto (QuantumultX 原生)
-        if (typeof $crypto !== 'undefined' && $crypto.decrypt) {
-            console.log('[汤头条] 使用 $crypto 进行解密');
-            const decrypted = $crypto.decrypt(hexData, 'aes-256-cfb', AES_KEY_HEX, AES_IV_STR);
-            if (decrypted) {
-                return decrypted;
+        const key = CryptoJS.enc.Hex.parse(AES_KEY_HEX);
+        const iv = CryptoJS.enc.Utf8.parse(AES_IV_STR);
+        const ciphertext = CryptoJS.enc.Hex.parse(hexData);
+
+        const decrypted = CryptoJS.AES.decrypt(
+            { ciphertext: ciphertext },
+            key,
+            {
+                iv: iv,
+                mode: CryptoJS.mode.CFB,
+                padding: CryptoJS.pad.NoPadding
             }
-        }
+        );
 
-        // 尝试使用 CryptoJS
-        if (typeof CryptoJS !== 'undefined') {
-            console.log('[汤头条] 使用 CryptoJS 进行解密');
-            const key = CryptoJS.enc.Hex.parse(AES_KEY_HEX);
-            const iv = CryptoJS.enc.Utf8.parse(AES_IV_STR);
-            const ciphertext = CryptoJS.enc.Hex.parse(hexData);
-
-            const decrypted = CryptoJS.AES.decrypt(
-                { ciphertext: ciphertext },
-                key,
-                {
-                    iv: iv,
-                    mode: CryptoJS.mode.CFB,
-                    padding: CryptoJS.pad.NoPadding
-                }
-            );
-
-            return decrypted.toString(CryptoJS.enc.Utf8);
-        }
-
-        // 尝试使用 crypto-js 模块 (如果已引入)
-        if (typeof require !== 'undefined') {
-            try {
-                console.log('[汤头条] 尝试 require crypto-js');
-                const CryptoModule = require('crypto-js');
-                const key = CryptoModule.enc.Hex.parse(AES_KEY_HEX);
-                const iv = CryptoModule.enc.Utf8.parse(AES_IV_STR);
-                const ciphertext = CryptoModule.enc.Hex.parse(hexData);
-
-                const decrypted = CryptoModule.AES.decrypt(
-                    { ciphertext: ciphertext },
-                    key,
-                    {
-                        iv: iv,
-                        mode: CryptoModule.mode.CFB,
-                        padding: CryptoModule.pad.NoPadding
-                    }
-                );
-
-                return decrypted.toString(CryptoModule.enc.Utf8);
-            } catch (requireError) {
-                console.log('[汤头条] require 失败:', requireError.message);
-            }
-        }
-
-        console.log('[汤头条] 所有加密库均不可用');
-        console.log('[汤头条] 环境检测: $crypto=' + (typeof $crypto) + ', CryptoJS=' + (typeof CryptoJS) + ', require=' + (typeof require));
-        return null;
-
+        return decrypted.toString(CryptoJS.enc.Utf8);
     } catch (e) {
-        console.log('[汤头条] 解密异常:', e.message || e);
-        console.log('[汤头条] 错误堆栈:', e.stack || '无');
+        console.log('[汤头条] 解密失败:', e.message || e);
         return null;
     }
 }
 
 /**
  * AES-CFB-256 加密
- * 支持 QuantumultX 的多种加密库环境
  */
 function aesEncrypt(plainText) {
     try {
-        // 尝试使用 $crypto (QuantumultX 原生)
-        if (typeof $crypto !== 'undefined' && $crypto.encrypt) {
-            console.log('[汤头条] 使用 $crypto 进行加密');
-            const encrypted = $crypto.encrypt(plainText, 'aes-256-cfb', AES_KEY_HEX, AES_IV_STR);
-            if (encrypted) {
-                return encrypted.toUpperCase();
+        const key = CryptoJS.enc.Hex.parse(AES_KEY_HEX);
+        const iv = CryptoJS.enc.Utf8.parse(AES_IV_STR);
+
+        const encrypted = CryptoJS.AES.encrypt(
+            plainText,
+            key,
+            {
+                iv: iv,
+                mode: CryptoJS.mode.CFB,
+                padding: CryptoJS.pad.NoPadding
             }
-        }
+        );
 
-        // 尝试使用 CryptoJS
-        if (typeof CryptoJS !== 'undefined') {
-            console.log('[汤头条] 使用 CryptoJS 进行加密');
-            const key = CryptoJS.enc.Hex.parse(AES_KEY_HEX);
-            const iv = CryptoJS.enc.Utf8.parse(AES_IV_STR);
-
-            const encrypted = CryptoJS.AES.encrypt(
-                plainText,
-                key,
-                {
-                    iv: iv,
-                    mode: CryptoJS.mode.CFB,
-                    padding: CryptoJS.pad.NoPadding
-                }
-            );
-
-            return encrypted.ciphertext.toString(CryptoJS.enc.Hex).toUpperCase();
-        }
-
-        // 尝试使用 crypto-js 模块
-        if (typeof require !== 'undefined') {
-            try {
-                console.log('[汤头条] 尝试 require crypto-js');
-                const CryptoModule = require('crypto-js');
-                const key = CryptoModule.enc.Hex.parse(AES_KEY_HEX);
-                const iv = CryptoModule.enc.Utf8.parse(AES_IV_STR);
-
-                const encrypted = CryptoModule.AES.encrypt(
-                    plainText,
-                    key,
-                    {
-                        iv: iv,
-                        mode: CryptoModule.mode.CFB,
-                        padding: CryptoModule.pad.NoPadding
-                    }
-                );
-
-                return encrypted.ciphertext.toString(CryptoModule.enc.Hex).toUpperCase();
-            } catch (requireError) {
-                console.log('[汤头条] require 失败:', requireError.message);
-            }
-        }
-
-        console.log('[汤头条] 所有加密库均不可用');
-        return null;
-
+        return encrypted.ciphertext.toString(CryptoJS.enc.Hex).toUpperCase();
     } catch (e) {
-        console.log('[汤头条] 加密异常:', e.message || e);
-        console.log('[汤头条] 错误堆栈:', e.stack || '无');
+        console.log('[汤头条] 加密失败:', e.message || e);
         return null;
     }
 }
 
 /**
  * 递归解锁视频对象
- * 将 preview_video 替换为 source_origin
  */
 function unlockVideoObject(obj) {
     if (!obj || typeof obj !== 'object') return obj;
@@ -246,35 +77,26 @@ function unlockVideoObject(obj) {
         return obj.map(item => unlockVideoObject(item));
     }
 
-    // 检查是否为视频对象（包含 source_origin 和 preview_video）
     if (obj.source_origin && obj.preview_video) {
         console.log(`[汤头条] 解锁视频: ${obj.title || obj.id || '未知'}`);
-
-        // 核心解锁：将试看链接替换为完整链接
+        // 核心解锁
         obj.preview_video = obj.source_origin;
-
-        // 标记为已付费/免费
         obj.is_pay = true;
         obj.isfree = 1;
         obj.coins = 0;
 
-        // 如果有多清晰度源，也替换
+        // 替换所有清晰度源
         if (obj.source_240) obj.source_240 = obj.source_origin;
         if (obj.source_480) obj.source_480 = obj.source_origin;
         if (obj.source_720) obj.source_720 = obj.source_origin;
         if (obj.source_1080) obj.source_1080 = obj.source_origin;
 
-        // 清除付费提示
-        if (obj.preview_tip) {
-            obj.preview_tip = '';
-        }
-
-        // 清除折扣信息
+        // 清除提示
+        if (obj.preview_tip) obj.preview_tip = '已解锁完整版';
         if (obj.discount) obj.discount = 0;
         if (obj.origin_coins) obj.origin_coins = 0;
     }
 
-    // 递归处理所有嵌套对象和数组
     for (const key in obj) {
         if (obj.hasOwnProperty(key) && typeof obj[key] === 'object' && obj[key] !== null) {
             obj[key] = unlockVideoObject(obj[key]);
@@ -285,73 +107,92 @@ function unlockVideoObject(obj) {
 }
 
 /**
- * 处理视频详情接口响应
+ * 核心处理逻辑
  */
-function processDetailResponse(body) {
+function processBody(body) {
     try {
         let jsonBody = JSON.parse(body);
 
-        // 情况1: 加密响应 (data 是十六进制字符串)
+        // 加密响应
         if (jsonBody.data && typeof jsonBody.data === 'string' && /^[A-Fa-f0-9]+$/.test(jsonBody.data)) {
-            console.log('[汤头条] 检测到加密响应，正在解密...');
-
+            console.log('[汤头条] 检测到加密响应');
             const decryptedStr = aesDecrypt(jsonBody.data);
-            if (!decryptedStr) {
-                console.log('[汤头条] 解密失败，返回原始响应');
-                return body;
-            }
+            if (!decryptedStr) return body;
 
             let decryptedData = JSON.parse(decryptedStr);
-            console.log('[汤头条] 解密成功，正在解锁视频...');
-
-            // 解锁视频
+            console.log('[汤头条] 解密成功，执行解锁...');
             decryptedData = unlockVideoObject(decryptedData);
 
-            // 重新加密
             const encryptedData = aesEncrypt(JSON.stringify(decryptedData));
-            if (encryptedData) {
-                jsonBody.data = encryptedData;
-                console.log('[汤头条] 重新加密成功');
-            } else {
-                console.log('[汤头条] 重新加密失败');
-            }
+            if (encryptedData) jsonBody.data = encryptedData;
 
             return JSON.stringify(jsonBody);
         }
 
-        // 情况2: 未加密响应 (data 是对象)
+        // 未加密响应
         if (jsonBody.data && typeof jsonBody.data === 'object') {
-            console.log('[汤头条] 检测到未加密响应，直接处理...');
+            console.log('[汤头条] 检测到未加密响应');
             jsonBody.data = unlockVideoObject(jsonBody.data);
             return JSON.stringify(jsonBody);
         }
 
-        console.log('[汤头条] 未知响应格式');
         return body;
-
     } catch (e) {
-        console.log('[汤头条] 处理响应失败:', e.message || e);
+        console.log('[汤头条] 处理失败:', e);
         return body;
     }
 }
 
 /**
- * 主入口
+ * 动态加载 CryptoJS 并执行
  */
-(function main() {
-    const response = $response;
+function loadCryptoJSAndRun() {
+    // 如果已经存在 CryptoJS，直接运行
+    if (typeof CryptoJS !== 'undefined') {
+        runScript();
+        return;
+    }
 
+    console.log('[汤头条] 正在加载 CryptoJS...');
+    const request = {
+        url: CRYPTO_JS_URL,
+        method: 'GET'
+    };
+
+    $task.fetch(request).then(response => {
+        if (response.statusCode === 200) {
+            try {
+                // 执行加载的库代码
+                eval(response.body);
+                console.log('[汤头条] CryptoJS 加载成功');
+                runScript();
+            } catch (e) {
+                console.log('[汤头条] CryptoJS 执行失败:', e);
+                $done({});
+            }
+        } else {
+            console.log('[汤头条] CryptoJS 下载失败，状态码:', response.statusCode);
+            $done({});
+        }
+    }, reason => {
+        console.log('[汤头条] CryptoJS 请求失败:', reason.error);
+        $done({});
+    });
+}
+
+/**
+ * 实际运行脚本
+ */
+function runScript() {
+    const response = $response;
     if (!response || !response.body) {
-        console.log('[汤头条] 响应体为空');
         $done({});
         return;
     }
 
-    console.log('[汤头条] ========== 开始处理 ==========');
-
-    const modifiedBody = processDetailResponse(response.body);
-
-    console.log('[汤头条] ========== 处理完成 ==========');
-
+    const modifiedBody = processBody(response.body);
     $done({ body: modifiedBody });
-})();
+}
+
+// 启动
+loadCryptoJSAndRun();
