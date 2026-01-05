@@ -5,16 +5,18 @@
  * 功能：解锁会员视频和金币视频
  * 原理：将 preview_video (试看链接) 替换为 source_origin (完整链接)
  * 
-[rewrite_local]
-^https?:\/\/api\d*\.armbmmk\.xyz\/pwa\.php\/api\/MvDetail\/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/tangtoutiao_unlock.js
- 
-[mitm]
-hostname = api*.armbmmk.xyz
+ [rewrite_local]
+ ^https?:\/\/api\d*\.armbmmk\.xyz\/pwa\.php\/api\/MvDetail\/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/tangtoutiao_unlock.js
+ * 
+ [mitm]
+ hostname = api*.armbmmk.xyz
  */
 
-// AES-CFB 加密配置
-const AES_KEY = '7205a6c3883caf95b52db5b534e12ec3'; // 32位 hex = 16字节
-const AES_IV = '81d7beac44a86f43';  // 16字符 ASCII = 16字节
+// AES-CFB-256 加密配置
+// 密钥 32字符 = 32字节 (作为 ASCII 字符串)
+const AES_KEY = '7205a6c3883caf95b52db5b534e12ec3';
+// IV 16字符 = 16字节 (作为 ASCII 字符串)
+const AES_IV = '81d7beac44a86f43';
 
 // Hex 转 Uint8Array
 function hexToUint8Array(hexString) {
@@ -25,7 +27,7 @@ function hexToUint8Array(hexString) {
     return bytes;
 }
 
-// ASCII 字符串转 Uint8Array
+// ASCII 字符串转 Uint8Array (用于密钥和IV)
 function asciiToUint8Array(str) {
     const bytes = new Uint8Array(str.length);
     for (let i = 0; i < str.length; i++) {
@@ -39,43 +41,35 @@ function uint8ArrayToHex(bytes) {
     return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
 }
 
-// Uint8Array 转 UTF8 字符串 (更安全的实现)
+// Uint8Array 转 UTF8 字符串
 function uint8ArrayToString(bytes) {
-    // 使用 TextDecoder 兼容方式
     let result = '';
     let i = 0;
     while (i < bytes.length) {
         const byte1 = bytes[i++];
         if (byte1 < 0x80) {
-            // 单字节 (ASCII)
             result += String.fromCharCode(byte1);
         } else if ((byte1 & 0xE0) === 0xC0) {
-            // 双字节
             const byte2 = bytes[i++] || 0;
             result += String.fromCharCode(((byte1 & 0x1F) << 6) | (byte2 & 0x3F));
         } else if ((byte1 & 0xF0) === 0xE0) {
-            // 三字节
             const byte2 = bytes[i++] || 0;
             const byte3 = bytes[i++] || 0;
             result += String.fromCharCode(((byte1 & 0x0F) << 12) | ((byte2 & 0x3F) << 6) | (byte3 & 0x3F));
         } else if ((byte1 & 0xF8) === 0xF0) {
-            // 四字节 (使用代理对)
             const byte2 = bytes[i++] || 0;
             const byte3 = bytes[i++] || 0;
             const byte4 = bytes[i++] || 0;
             const codePoint = ((byte1 & 0x07) << 18) | ((byte2 & 0x3F) << 12) | ((byte3 & 0x3F) << 6) | (byte4 & 0x3F);
             if (codePoint > 0x10FFFF) {
-                // 无效的代码点，使用替换字符
                 result += '\uFFFD';
             } else if (codePoint > 0xFFFF) {
-                // 需要代理对
                 const offset = codePoint - 0x10000;
                 result += String.fromCharCode(0xD800 + (offset >> 10), 0xDC00 + (offset & 0x3FF));
             } else {
                 result += String.fromCharCode(codePoint);
             }
         } else {
-            // 无效的 UTF-8 起始字节，跳过或替换
             result += String.fromCharCode(byte1);
         }
     }
@@ -87,8 +81,6 @@ function stringToUint8Array(str) {
     const bytes = [];
     for (let i = 0; i < str.length; i++) {
         let code = str.charCodeAt(i);
-
-        // 处理代理对
         if (code >= 0xD800 && code <= 0xDBFF && i + 1 < str.length) {
             const next = str.charCodeAt(i + 1);
             if (next >= 0xDC00 && next <= 0xDFFF) {
@@ -96,7 +88,6 @@ function stringToUint8Array(str) {
                 i++;
             }
         }
-
         if (code < 0x80) {
             bytes.push(code);
         } else if (code < 0x800) {
@@ -130,7 +121,8 @@ const SBOX = [
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
 ];
 
-const RCON = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36];
+// AES-256 Rcon (需要7个值)
+const RCON = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40];
 
 // GF(2^8) 乘法
 function gmul(a, b) {
@@ -145,21 +137,34 @@ function gmul(a, b) {
     return p;
 }
 
-// 密钥扩展
-function keyExpansion(key) {
-    const w = new Array(44);
-    for (let i = 0; i < 4; i++) {
+// AES-256 密钥扩展 (生成60个字)
+function keyExpansion256(key) {
+    const Nk = 8; // AES-256 密钥长度为8个字
+    const Nr = 14; // AES-256 有14轮
+    const w = new Array((Nr + 1) * 4); // 60个字
+
+    // 复制初始密钥
+    for (let i = 0; i < Nk; i++) {
         w[i] = (key[4 * i] << 24) | (key[4 * i + 1] << 16) | (key[4 * i + 2] << 8) | key[4 * i + 3];
     }
-    for (let i = 4; i < 44; i++) {
+
+    // 扩展密钥
+    for (let i = Nk; i < (Nr + 1) * 4; i++) {
         let temp = w[i - 1];
-        if (i % 4 === 0) {
+        if (i % Nk === 0) {
+            // RotWord + SubWord + Rcon
             temp = ((SBOX[(temp >> 16) & 0xff] << 24) |
                 (SBOX[(temp >> 8) & 0xff] << 16) |
                 (SBOX[temp & 0xff] << 8) |
-                SBOX[(temp >> 24) & 0xff]) ^ (RCON[i / 4 - 1] << 24);
+                SBOX[(temp >> 24) & 0xff]) ^ (RCON[(i / Nk) - 1] << 24);
+        } else if (Nk > 6 && i % Nk === 4) {
+            // AES-256 额外的 SubWord
+            temp = (SBOX[(temp >> 24) & 0xff] << 24) |
+                (SBOX[(temp >> 16) & 0xff] << 16) |
+                (SBOX[(temp >> 8) & 0xff] << 8) |
+                SBOX[temp & 0xff];
         }
-        w[i] = w[i - 4] ^ temp;
+        w[i] = w[i - Nk] ^ temp;
     }
     return w;
 }
@@ -204,9 +209,11 @@ function addRoundKey(state, w, round) {
     }
 }
 
-// AES-128 加密单个块
-function aesEncryptBlock(block, expandedKey) {
+// AES-256 加密单个块 (14轮)
+function aes256EncryptBlock(block, expandedKey) {
+    const Nr = 14; // AES-256 有14轮
     const state = new Uint8Array(16);
+
     // 列优先排列
     for (let r = 0; r < 4; r++) {
         for (let c = 0; c < 4; c++) {
@@ -216,16 +223,17 @@ function aesEncryptBlock(block, expandedKey) {
 
     addRoundKey(state, expandedKey, 0);
 
-    for (let round = 1; round < 10; round++) {
+    for (let round = 1; round < Nr; round++) {
         subBytes(state);
         shiftRows(state);
         mixColumns(state);
         addRoundKey(state, expandedKey, round);
     }
 
+    // 最后一轮没有 MixColumns
     subBytes(state);
     shiftRows(state);
-    addRoundKey(state, expandedKey, 10);
+    addRoundKey(state, expandedKey, Nr);
 
     // 转换回行优先排列
     const output = new Uint8Array(16);
@@ -237,25 +245,29 @@ function aesEncryptBlock(block, expandedKey) {
     return output;
 }
 
-// AES-CFB 解密
+// AES-256-CFB 解密
 function aesCfbDecrypt(ciphertext, key, iv) {
-    const keyBytes = hexToUint8Array(key);
-    // IV 是 16 字符 ASCII 字符串
+    // 密钥: 32字节 (作为ASCII字符串)
+    const keyBytes = asciiToUint8Array(key);
+    // IV: 16字节 (作为ASCII字符串)  
     const ivBytes = asciiToUint8Array(iv);
-    const expandedKey = keyExpansion(keyBytes);
 
+    console.log('[汤头条解锁] 密钥长度: ' + keyBytes.length + ' 字节');
+    console.log('[汤头条解锁] IV长度: ' + ivBytes.length + ' 字节');
+
+    const expandedKey = keyExpansion256(keyBytes);
     const plaintext = new Uint8Array(ciphertext.length);
     let prevBlock = ivBytes;
 
     for (let i = 0; i < ciphertext.length; i += 16) {
-        const encryptedIV = aesEncryptBlock(prevBlock, expandedKey);
+        const encryptedIV = aes256EncryptBlock(prevBlock, expandedKey);
         const blockSize = Math.min(16, ciphertext.length - i);
 
         for (let j = 0; j < blockSize; j++) {
             plaintext[i + j] = ciphertext[i + j] ^ encryptedIV[j];
         }
 
-        // 下一个块使用当前密文块
+        // CFB模式: 下一个块使用当前密文块
         prevBlock = new Uint8Array(16);
         for (let j = 0; j < blockSize; j++) {
             prevBlock[j] = ciphertext[i + j];
@@ -270,24 +282,24 @@ function aesCfbDecrypt(ciphertext, key, iv) {
     return plaintext;
 }
 
-// AES-CFB 加密
+// AES-256-CFB 加密
 function aesCfbEncrypt(plaintext, key, iv) {
-    const keyBytes = hexToUint8Array(key);
+    const keyBytes = asciiToUint8Array(key);
     const ivBytes = asciiToUint8Array(iv);
-    const expandedKey = keyExpansion(keyBytes);
+    const expandedKey = keyExpansion256(keyBytes);
 
     const ciphertext = new Uint8Array(plaintext.length);
     let prevBlock = ivBytes;
 
     for (let i = 0; i < plaintext.length; i += 16) {
-        const encryptedIV = aesEncryptBlock(prevBlock, expandedKey);
+        const encryptedIV = aes256EncryptBlock(prevBlock, expandedKey);
         const blockSize = Math.min(16, plaintext.length - i);
 
         for (let j = 0; j < blockSize; j++) {
             ciphertext[i + j] = plaintext[i + j] ^ encryptedIV[j];
         }
 
-        // 下一个块使用当前密文块
+        // CFB模式: 下一个块使用当前密文块
         prevBlock = new Uint8Array(16);
         for (let j = 0; j < blockSize; j++) {
             prevBlock[j] = ciphertext[i + j];
@@ -301,13 +313,11 @@ function aesCfbEncrypt(plaintext, key, iv) {
 function unlockVideo(jsonData) {
     let modified = false;
 
-    // 递归处理 JSON 对象
     function processObject(obj) {
         if (typeof obj !== 'object' || obj === null) return;
 
-        // 检查是否有 source_origin 和 preview_video 字段
+        // 替换视频链接
         if (obj.source_origin && obj.preview_video) {
-            // 使用完整视频链接替换试看链接
             obj.preview_video = obj.source_origin;
             modified = true;
             console.log('[汤头条解锁] 替换 preview_video -> source_origin');
@@ -341,7 +351,7 @@ function unlockVideo(jsonData) {
             modified = true;
         }
 
-        // 递归处理子对象和数组
+        // 递归处理
         for (const key in obj) {
             if (Array.isArray(obj[key])) {
                 obj[key].forEach(item => processObject(item));
@@ -367,22 +377,25 @@ function main() {
             return;
         }
 
-        console.log('[汤头条解锁] 开始解密数据...');
+        console.log('[汤头条解锁] 开始解密数据 (AES-256-CFB)...');
 
         // 解密数据
         const encryptedData = hexToUint8Array(jsonBody.data);
+        console.log('[汤头条解锁] 密文长度: ' + encryptedData.length + ' 字节');
+
         const decryptedBytes = aesCfbDecrypt(encryptedData, AES_KEY, AES_IV);
         const decryptedStr = uint8ArrayToString(decryptedBytes);
 
-        // 去除可能的填充字符和无效字符
+        // 去除无效字符
         const trimmedStr = decryptedStr.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]+/g, '');
 
-        // 尝试找到有效的 JSON 部分
+        // 尝试找到有效的 JSON
         const jsonStart = trimmedStr.indexOf('{');
         const jsonEnd = trimmedStr.lastIndexOf('}');
 
         if (jsonStart === -1 || jsonEnd === -1) {
             console.log('[汤头条解锁] 未找到有效 JSON');
+            console.log('[汤头条解锁] 解密结果前200字符: ' + trimmedStr.substring(0, 200));
             $done({ body: body });
             return;
         }
@@ -401,16 +414,13 @@ function main() {
 
         console.log('[汤头条解锁] 解密成功，开始解锁...');
 
-        // 解锁视频
         const wasModified = unlockVideo(dataJson);
 
         if (wasModified) {
-            // 重新加密数据
             const modifiedStr = JSON.stringify(dataJson);
             const modifiedBytes = stringToUint8Array(modifiedStr);
             const encryptedBytes = aesCfbEncrypt(modifiedBytes, AES_KEY, AES_IV);
 
-            // 更新响应
             jsonBody.data = uint8ArrayToHex(encryptedBytes);
 
             console.log('[汤头条解锁] 解锁成功！');
@@ -421,7 +431,6 @@ function main() {
         }
     } catch (error) {
         console.log('[汤头条解锁] 处理出错: ' + error.message);
-        console.log('[汤头条解锁] 错误堆栈: ' + error.stack);
         $done({ body: $response.body });
     }
 }
