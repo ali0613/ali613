@@ -12,7 +12,13 @@
  */
 
 // AES-CFB-256 加解密参数
-const AES_KEY_HEX = '7205a6c3883caf95b52db5b534e12ec3';
+// 注意：AES-256 需要 32 字节密钥。
+// "7205a6c3883caf95b52db5b534e12ec3" 是 32 个字符。
+// 如果作为 Hex 解析只有 16 字节 (AES-128)。
+// 如果作为 UTF8 字符串解析则是 32 字节 (AES-256)。
+// 根据 "AES-CFB-256" 的描述，这里应该使用 UTF8 解析。
+// 同理 IV "81d7beac44a86f43" 是 16 个字符，作为 UTF8 解析为 16 字节 (128 bits)，符合 AES block size。
+const AES_KEY_STR = '7205a6c3883caf95b52db5b534e12ec3';
 const AES_IV_STR = '81d7beac44a86f43';
 const CRYPTO_JS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js';
 
@@ -21,9 +27,12 @@ const CRYPTO_JS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/cr
  */
 function aesDecrypt(hexData) {
     try {
-        const key = CryptoJS.enc.Hex.parse(AES_KEY_HEX);
+        // 使用 Utf8 解析 Key 以获得 32 字节 (256 bits)
+        const key = CryptoJS.enc.Utf8.parse(AES_KEY_STR);
         const iv = CryptoJS.enc.Utf8.parse(AES_IV_STR);
         const ciphertext = CryptoJS.enc.Hex.parse(hexData);
+
+        console.log(`[汤头条] Key字节数: ${key.sigBytes}, IV字节数: ${iv.sigBytes}`);
 
         const decrypted = CryptoJS.AES.decrypt(
             { ciphertext: ciphertext },
@@ -35,9 +44,13 @@ function aesDecrypt(hexData) {
             }
         );
 
-        return decrypted.toString(CryptoJS.enc.Utf8);
+        const result = decrypted.toString(CryptoJS.enc.Utf8);
+        if (!result) {
+            console.log('[汤头条] 解密结果为空，可能是密钥错误或算法模式不匹配');
+        }
+        return result;
     } catch (e) {
-        console.log('[汤头条] 解密失败:', e.message || e);
+        console.log('[汤头条] 解密抛出异常:', e.message || e);
         return null;
     }
 }
@@ -47,7 +60,7 @@ function aesDecrypt(hexData) {
  */
 function aesEncrypt(plainText) {
     try {
-        const key = CryptoJS.enc.Hex.parse(AES_KEY_HEX);
+        const key = CryptoJS.enc.Utf8.parse(AES_KEY_STR);
         const iv = CryptoJS.enc.Utf8.parse(AES_IV_STR);
 
         const encrypted = CryptoJS.AES.encrypt(
