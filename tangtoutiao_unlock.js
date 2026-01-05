@@ -5,16 +5,16 @@
  * 功能：解锁会员视频和金币视频
  * 原理：将 preview_video (试看链接) 替换为 source_origin (完整链接)
  * 
- [rewrite_local]
- ^https?:\/\/api\d*\.armbmmk\.xyz\/pwa\.php\/api\/MvDetail\/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/main/tangtoutiao_unlock.js
- * 
- [mitm]
- hostname = api*.armbmmk.xyz
+[rewrite_local]
+^https?:\/\/api\d*\.armbmmk\.xyz\/pwa\.php\/api\/MvDetail\/detail url script-response-body https://raw.githubusercontent.com/your-repo/tangtoutiao_unlock.js
+ 
+[mitm]
+hostname = api*.armbmmk.xyz
  */
 
 // AES-CFB 加密配置
-const AES_KEY = '7205a6c3883caf95b52db5b534e12ec3';
-const AES_IV = '81d7beac44a86f43';
+const AES_KEY = '7205a6c3883caf95b52db5b534e12ec3'; // 32位 hex = 16字节
+const AES_IV = '81d7beac44a86f43';  // 16字符 ASCII = 16字节
 
 // Hex 转 Uint8Array
 function hexToUint8Array(hexString) {
@@ -25,25 +25,58 @@ function hexToUint8Array(hexString) {
     return bytes;
 }
 
+// ASCII 字符串转 Uint8Array
+function asciiToUint8Array(str) {
+    const bytes = new Uint8Array(str.length);
+    for (let i = 0; i < str.length; i++) {
+        bytes[i] = str.charCodeAt(i) & 0xff;
+    }
+    return bytes;
+}
+
 // Uint8Array 转 Hex
 function uint8ArrayToHex(bytes) {
     return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
 }
 
-// Uint8Array 转 UTF8 字符串
+// Uint8Array 转 UTF8 字符串 (更安全的实现)
 function uint8ArrayToString(bytes) {
+    // 使用 TextDecoder 兼容方式
     let result = '';
-    for (let i = 0; i < bytes.length; i++) {
-        const byte = bytes[i];
-        if (byte < 0x80) {
-            result += String.fromCharCode(byte);
-        } else if (byte < 0xE0) {
-            result += String.fromCharCode(((byte & 0x1F) << 6) | (bytes[++i] & 0x3F));
-        } else if (byte < 0xF0) {
-            result += String.fromCharCode(((byte & 0x0F) << 12) | ((bytes[++i] & 0x3F) << 6) | (bytes[++i] & 0x3F));
+    let i = 0;
+    while (i < bytes.length) {
+        const byte1 = bytes[i++];
+        if (byte1 < 0x80) {
+            // 单字节 (ASCII)
+            result += String.fromCharCode(byte1);
+        } else if ((byte1 & 0xE0) === 0xC0) {
+            // 双字节
+            const byte2 = bytes[i++] || 0;
+            result += String.fromCharCode(((byte1 & 0x1F) << 6) | (byte2 & 0x3F));
+        } else if ((byte1 & 0xF0) === 0xE0) {
+            // 三字节
+            const byte2 = bytes[i++] || 0;
+            const byte3 = bytes[i++] || 0;
+            result += String.fromCharCode(((byte1 & 0x0F) << 12) | ((byte2 & 0x3F) << 6) | (byte3 & 0x3F));
+        } else if ((byte1 & 0xF8) === 0xF0) {
+            // 四字节 (使用代理对)
+            const byte2 = bytes[i++] || 0;
+            const byte3 = bytes[i++] || 0;
+            const byte4 = bytes[i++] || 0;
+            const codePoint = ((byte1 & 0x07) << 18) | ((byte2 & 0x3F) << 12) | ((byte3 & 0x3F) << 6) | (byte4 & 0x3F);
+            if (codePoint > 0x10FFFF) {
+                // 无效的代码点，使用替换字符
+                result += '\uFFFD';
+            } else if (codePoint > 0xFFFF) {
+                // 需要代理对
+                const offset = codePoint - 0x10000;
+                result += String.fromCharCode(0xD800 + (offset >> 10), 0xDC00 + (offset & 0x3FF));
+            } else {
+                result += String.fromCharCode(codePoint);
+            }
         } else {
-            const codePoint = ((byte & 0x07) << 18) | ((bytes[++i] & 0x3F) << 12) | ((bytes[++i] & 0x3F) << 6) | (bytes[++i] & 0x3F);
-            result += String.fromCodePoint(codePoint);
+            // 无效的 UTF-8 起始字节，跳过或替换
+            result += String.fromCharCode(byte1);
         }
     }
     return result;
@@ -53,7 +86,17 @@ function uint8ArrayToString(bytes) {
 function stringToUint8Array(str) {
     const bytes = [];
     for (let i = 0; i < str.length; i++) {
-        const code = str.codePointAt(i);
+        let code = str.charCodeAt(i);
+
+        // 处理代理对
+        if (code >= 0xD800 && code <= 0xDBFF && i + 1 < str.length) {
+            const next = str.charCodeAt(i + 1);
+            if (next >= 0xDC00 && next <= 0xDFFF) {
+                code = 0x10000 + ((code - 0xD800) << 10) + (next - 0xDC00);
+                i++;
+            }
+        }
+
         if (code < 0x80) {
             bytes.push(code);
         } else if (code < 0x800) {
@@ -62,13 +105,12 @@ function stringToUint8Array(str) {
             bytes.push(0xE0 | (code >> 12), 0x80 | ((code >> 6) & 0x3F), 0x80 | (code & 0x3F));
         } else {
             bytes.push(0xF0 | (code >> 18), 0x80 | ((code >> 12) & 0x3F), 0x80 | ((code >> 6) & 0x3F), 0x80 | (code & 0x3F));
-            i++; // 跳过代理对的第二个字符
         }
     }
     return new Uint8Array(bytes);
 }
 
-// AES-128 单块加密 (使用查表法)
+// AES S-Box
 const SBOX = [
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -198,7 +240,8 @@ function aesEncryptBlock(block, expandedKey) {
 // AES-CFB 解密
 function aesCfbDecrypt(ciphertext, key, iv) {
     const keyBytes = hexToUint8Array(key);
-    const ivBytes = hexToUint8Array(iv.padEnd(32, '0').substring(0, 32)); // IV 需要 16 字节
+    // IV 是 16 字符 ASCII 字符串
+    const ivBytes = asciiToUint8Array(iv);
     const expandedKey = keyExpansion(keyBytes);
 
     const plaintext = new Uint8Array(ciphertext.length);
@@ -230,7 +273,7 @@ function aesCfbDecrypt(ciphertext, key, iv) {
 // AES-CFB 加密
 function aesCfbEncrypt(plaintext, key, iv) {
     const keyBytes = hexToUint8Array(key);
-    const ivBytes = hexToUint8Array(iv.padEnd(32, '0').substring(0, 32));
+    const ivBytes = asciiToUint8Array(iv);
     const expandedKey = keyExpansion(keyBytes);
 
     const ciphertext = new Uint8Array(plaintext.length);
@@ -298,9 +341,11 @@ function unlockVideo(jsonData) {
             modified = true;
         }
 
-        // 递归处理子对象
+        // 递归处理子对象和数组
         for (const key in obj) {
-            if (typeof obj[key] === 'object') {
+            if (Array.isArray(obj[key])) {
+                obj[key].forEach(item => processObject(item));
+            } else if (typeof obj[key] === 'object') {
                 processObject(obj[key]);
             }
         }
@@ -322,22 +367,39 @@ function main() {
             return;
         }
 
+        console.log('[汤头条解锁] 开始解密数据...');
+
         // 解密数据
         const encryptedData = hexToUint8Array(jsonBody.data);
         const decryptedBytes = aesCfbDecrypt(encryptedData, AES_KEY, AES_IV);
         const decryptedStr = uint8ArrayToString(decryptedBytes);
 
-        // 去除可能的填充字符
-        const trimmedStr = decryptedStr.replace(/[\x00-\x1f]+$/, '');
+        // 去除可能的填充字符和无效字符
+        const trimmedStr = decryptedStr.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]+/g, '');
 
-        let dataJson;
-        try {
-            dataJson = JSON.parse(trimmedStr);
-        } catch (e) {
-            console.log('[汤头条解锁] 解密后 JSON 解析失败');
+        // 尝试找到有效的 JSON 部分
+        const jsonStart = trimmedStr.indexOf('{');
+        const jsonEnd = trimmedStr.lastIndexOf('}');
+
+        if (jsonStart === -1 || jsonEnd === -1) {
+            console.log('[汤头条解锁] 未找到有效 JSON');
             $done({ body: body });
             return;
         }
+
+        const jsonStr = trimmedStr.substring(jsonStart, jsonEnd + 1);
+
+        let dataJson;
+        try {
+            dataJson = JSON.parse(jsonStr);
+        } catch (e) {
+            console.log('[汤头条解锁] 解密后 JSON 解析失败: ' + e.message);
+            console.log('[汤头条解锁] JSON 前100字符: ' + jsonStr.substring(0, 100));
+            $done({ body: body });
+            return;
+        }
+
+        console.log('[汤头条解锁] 解密成功，开始解锁...');
 
         // 解锁视频
         const wasModified = unlockVideo(dataJson);
@@ -359,6 +421,7 @@ function main() {
         }
     } catch (error) {
         console.log('[汤头条解锁] 处理出错: ' + error.message);
+        console.log('[汤头条解锁] 错误堆栈: ' + error.stack);
         $done({ body: $response.body });
     }
 }
