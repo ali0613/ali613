@@ -1,3 +1,14 @@
+// ==UserScript==
+// @name         汤头条视频解锁
+// @namespace    https://github.com/ali0613/ali613
+// @version      1.0.0
+// @description  解锁汤头条会员视频和金币视频
+// @author       Assistant
+// @match        https://api*.armbmmk.xyz/pwa.php/api/MvDetail/detail
+// @require      https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js
+// @grant        none
+// ==/UserScript==
+
 /**
  * 汤头条视频解锁脚本 for QuantumultX
  * 
@@ -24,6 +35,28 @@
  * 
  * ============================================================
  */
+
+// 动态加载 CryptoJS (如果 @require 不工作)
+if (typeof CryptoJS === 'undefined') {
+    console.log('[汤头条] CryptoJS 未加载，尝试动态引入...');
+
+    // 尝试从全局变量获取
+    if (typeof globalThis !== 'undefined' && globalThis.CryptoJS) {
+        var CryptoJS = globalThis.CryptoJS;
+        console.log('[汤头条] 从 globalThis 获取 CryptoJS');
+    } else if (typeof window !== 'undefined' && window.CryptoJS) {
+        var CryptoJS = window.CryptoJS;
+        console.log('[汤头条] 从 window 获取 CryptoJS');
+    } else if (typeof self !== 'undefined' && self.CryptoJS) {
+        var CryptoJS = self.CryptoJS;
+        console.log('[汤头条] 从 self 获取 CryptoJS');
+    } else {
+        console.log('[汤头条] 警告: 无法加载 CryptoJS，脚本可能无法正常工作');
+        console.log('[汤头条] 请确保：');
+        console.log('[汤头条] 1. 脚本顶部的 @require 指令有效');
+        console.log('[汤头条] 2. 或手动在 QuantumultX 中配置 CryptoJS 库');
+    }
+}
 
 // AES-CFB-256 加解密参数
 const AES_KEY_HEX = '7205a6c3883caf95b52db5b534e12ec3';
