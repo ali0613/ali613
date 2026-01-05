@@ -5,11 +5,11 @@
  * 功能：解锁会员视频和金币视频
  * 原理：将 preview_video (试看链接) 替换为 source_origin (完整链接)
  * 
- * [rewrite_local]
- * ^https?:\/\/api\d*\.armbmmk\.xyz\/pwa\.php\/api\/MvDetail\/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/main/tangtoutiao_unlock.js
+ [rewrite_local]
+ ^https?:\/\/api\d*\.armbmmk\.xyz\/pwa\.php\/api\/MvDetail\/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/main/tangtoutiao_unlock.js
  * 
- * [mitm]
- * hostname = api*.armbmmk.xyz
+ [mitm]
+ hostname = api*.armbmmk.xyz
  */
 
 // AES-CFB 加密配置
