@@ -6,7 +6,7 @@
  * 原理：将 preview_video (试看链接) 替换为 source_origin (完整链接)
  * 
 [rewrite_local]
-^https?:\/\/api\d*\.armbmmk\.xyz\/pwa\.php\/api\/MvDetail\/detail url script-response-body https://raw.githubusercontent.com/your-repo/tangtoutiao_unlock.js
+^https?:\/\/api\d*\.armbmmk\.xyz\/pwa\.php\/api\/MvDetail\/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/tangtoutiao_unlock.js
  
 [mitm]
 hostname = api*.armbmmk.xyz
