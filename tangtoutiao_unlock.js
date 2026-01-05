@@ -13,7 +13,7 @@
  */
 
 var AES_KEY_HEX = "7205a6c3883caf95b52db5b534e12ec3"; // 16字节 = 128位
-var AES_IV_STR = "81d7beac44a86f43"; // 16字节IV
+var AES_IV_HEX = "81d7beac44a86f43"; // 8字节hex, 需要补齐到16字节
 
 // S-Box
 var SBOX = [
@@ -90,6 +90,16 @@ function bytesToStr(bytes) {
         }
     }
     return str;
+}
+
+// 将hex IV转换为16字节（8字节hex + 8字节0填充）
+function getIV() {
+    var ivBytes = hexToBytes(AES_IV_HEX);
+    // 补齐到16字节
+    while (ivBytes.length < 16) {
+        ivBytes.push(0);
+    }
+    return ivBytes;
 }
 
 // ==================== AES-128 实现 ====================
@@ -181,9 +191,9 @@ function aesEncryptBlock128(input, expandedKey) {
 
 // ==================== CFB 模式 (AES-128) ====================
 
-function aesCfbDecrypt(hexData, keyHex, ivStr) {
+function aesCfbDecrypt(hexData, keyHex) {
     var key = hexToBytes(keyHex);
-    var iv = strToBytes(ivStr);
+    var iv = getIV();
     var data = hexToBytes(hexData);
     var expandedKey = keyExpansion128(key);
 
@@ -213,9 +223,9 @@ function aesCfbDecrypt(hexData, keyHex, ivStr) {
     return bytesToStr(result);
 }
 
-function aesCfbEncrypt(text, keyHex, ivStr) {
+function aesCfbEncrypt(text, keyHex) {
     var key = hexToBytes(keyHex);
-    var iv = strToBytes(ivStr);
+    var iv = getIV();
     var data = strToBytes(text);
     var expandedKey = keyExpansion128(key);
 
@@ -321,7 +331,7 @@ function main() {
             console.log("[汤头条解锁] 开始解密数据...");
 
             // 解密
-            var decryptedStr = aesCfbDecrypt(obj.data, AES_KEY_HEX, AES_IV_STR);
+            var decryptedStr = aesCfbDecrypt(obj.data, AES_KEY_HEX);
             console.log("[汤头条解锁] 解密成功，数据长度: " + decryptedStr.length);
 
             // 打印前100字符用于调试
@@ -333,7 +343,7 @@ function main() {
             decryptedData = unlockVideo(decryptedData);
 
             // 加密
-            var encryptedData = aesCfbEncrypt(JSON.stringify(decryptedData), AES_KEY_HEX, AES_IV_STR);
+            var encryptedData = aesCfbEncrypt(JSON.stringify(decryptedData), AES_KEY_HEX);
             obj.data = encryptedData;
 
             console.log("[汤头条解锁] 处理完成!");
