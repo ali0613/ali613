@@ -64,12 +64,23 @@ function bytesToStr(bytes) {
 }
 
 /**
- * AES-CFB-256 解密 (使用 QuantumultX 内置的 $cryptojs)
+ * AES-CFB-256 解密
+ * 支持 QuantumultX 的多种加密库环境
  */
 function aesDecrypt(hexData) {
     try {
-        // QuantumultX 使用 CryptoJS
+        // 尝试使用 $crypto (QuantumultX 原生)
+        if (typeof $crypto !== 'undefined' && $crypto.decrypt) {
+            console.log('[汤头条] 使用 $crypto 进行解密');
+            const decrypted = $crypto.decrypt(hexData, 'aes-256-cfb', AES_KEY_HEX, AES_IV_STR);
+            if (decrypted) {
+                return decrypted;
+            }
+        }
+
+        // 尝试使用 CryptoJS
         if (typeof CryptoJS !== 'undefined') {
+            console.log('[汤头条] 使用 CryptoJS 进行解密');
             const key = CryptoJS.enc.Hex.parse(AES_KEY_HEX);
             const iv = CryptoJS.enc.Utf8.parse(AES_IV_STR);
             const ciphertext = CryptoJS.enc.Hex.parse(hexData);
@@ -87,20 +98,60 @@ function aesDecrypt(hexData) {
             return decrypted.toString(CryptoJS.enc.Utf8);
         }
 
-        console.log('[汤头条] CryptoJS 不可用');
+        // 尝试使用 crypto-js 模块 (如果已引入)
+        if (typeof require !== 'undefined') {
+            try {
+                console.log('[汤头条] 尝试 require crypto-js');
+                const CryptoModule = require('crypto-js');
+                const key = CryptoModule.enc.Hex.parse(AES_KEY_HEX);
+                const iv = CryptoModule.enc.Utf8.parse(AES_IV_STR);
+                const ciphertext = CryptoModule.enc.Hex.parse(hexData);
+
+                const decrypted = CryptoModule.AES.decrypt(
+                    { ciphertext: ciphertext },
+                    key,
+                    {
+                        iv: iv,
+                        mode: CryptoModule.mode.CFB,
+                        padding: CryptoModule.pad.NoPadding
+                    }
+                );
+
+                return decrypted.toString(CryptoModule.enc.Utf8);
+            } catch (requireError) {
+                console.log('[汤头条] require 失败:', requireError.message);
+            }
+        }
+
+        console.log('[汤头条] 所有加密库均不可用');
+        console.log('[汤头条] 环境检测: $crypto=' + (typeof $crypto) + ', CryptoJS=' + (typeof CryptoJS) + ', require=' + (typeof require));
         return null;
+
     } catch (e) {
-        console.log('[汤头条] 解密失败:', e.message || e);
+        console.log('[汤头条] 解密异常:', e.message || e);
+        console.log('[汤头条] 错误堆栈:', e.stack || '无');
         return null;
     }
 }
 
 /**
  * AES-CFB-256 加密
+ * 支持 QuantumultX 的多种加密库环境
  */
 function aesEncrypt(plainText) {
     try {
+        // 尝试使用 $crypto (QuantumultX 原生)
+        if (typeof $crypto !== 'undefined' && $crypto.encrypt) {
+            console.log('[汤头条] 使用 $crypto 进行加密');
+            const encrypted = $crypto.encrypt(plainText, 'aes-256-cfb', AES_KEY_HEX, AES_IV_STR);
+            if (encrypted) {
+                return encrypted.toUpperCase();
+            }
+        }
+
+        // 尝试使用 CryptoJS
         if (typeof CryptoJS !== 'undefined') {
+            console.log('[汤头条] 使用 CryptoJS 进行加密');
             const key = CryptoJS.enc.Hex.parse(AES_KEY_HEX);
             const iv = CryptoJS.enc.Utf8.parse(AES_IV_STR);
 
@@ -117,10 +168,36 @@ function aesEncrypt(plainText) {
             return encrypted.ciphertext.toString(CryptoJS.enc.Hex).toUpperCase();
         }
 
-        console.log('[汤头条] CryptoJS 不可用');
+        // 尝试使用 crypto-js 模块
+        if (typeof require !== 'undefined') {
+            try {
+                console.log('[汤头条] 尝试 require crypto-js');
+                const CryptoModule = require('crypto-js');
+                const key = CryptoModule.enc.Hex.parse(AES_KEY_HEX);
+                const iv = CryptoModule.enc.Utf8.parse(AES_IV_STR);
+
+                const encrypted = CryptoModule.AES.encrypt(
+                    plainText,
+                    key,
+                    {
+                        iv: iv,
+                        mode: CryptoModule.mode.CFB,
+                        padding: CryptoModule.pad.NoPadding
+                    }
+                );
+
+                return encrypted.ciphertext.toString(CryptoModule.enc.Hex).toUpperCase();
+            } catch (requireError) {
+                console.log('[汤头条] require 失败:', requireError.message);
+            }
+        }
+
+        console.log('[汤头条] 所有加密库均不可用');
         return null;
+
     } catch (e) {
-        console.log('[汤头条] 加密失败:', e.message || e);
+        console.log('[汤头条] 加密异常:', e.message || e);
+        console.log('[汤头条] 错误堆栈:', e.stack || '无');
         return null;
     }
 }
