@@ -81,42 +81,58 @@ function aesEncrypt(plainText) {
 }
 
 /**
- * 递归解锁视频对象
+ * 处理单个视频对象解锁
  */
-function unlockVideoObject(obj) {
-    if (!obj || typeof obj !== 'object') return obj;
+function processVideoItem(item) {
+    if (!item || typeof item !== 'object') return;
 
-    if (Array.isArray(obj)) {
-        return obj.map(item => unlockVideoObject(item));
+    // 检查是否有必要的字段
+    // 至少要有 source_origin 或 source_240
+    if (!item.source_origin && !item.source_240) return;
+
+    console.log(`[汤头条] 处理视频: ${item.title || item.id || '未知'}`);
+
+    let targetUrl = '';
+    const src240 = item.source_240 || '';
+
+    // 逻辑判断
+    // 1. 如果 source_240 链接中包含 "play"，则使用 source_origin
+    if (src240.includes('play')) {
+        console.log('[汤头条] 匹配到 play，使用 source_origin');
+        targetUrl = item.source_origin;
+    }
+    // 2. 如果 source_240 包含 "videos5"，则使用 source_240
+    else if (src240.includes('videos5')) {
+        console.log('[汤头条] 匹配到 videos5，使用 source_240');
+        targetUrl = src240;
+    }
+    // 3. 默认回退：如果有 source_origin 则用它，否则用 source_240
+    else {
+        console.log('[汤头条] 未匹配特定规则，默认使用 source_origin');
+        targetUrl = item.source_origin || item.source_240;
     }
 
-    if (obj.source_origin && obj.preview_video) {
-        console.log(`[汤头条] 解锁视频: ${obj.title || obj.id || '未知'}`);
-        // 核心解锁
-        obj.preview_video = obj.source_origin;
-        obj.is_pay = true;
-        obj.isfree = 1;
-        obj.coins = 0;
+    if (targetUrl) {
+        // 执行替换
+        item.preview_video = targetUrl;
 
-        // 替换所有清晰度源
-        if (obj.source_240) obj.source_240 = obj.source_origin;
-        if (obj.source_480) obj.source_480 = obj.source_origin;
-        if (obj.source_720) obj.source_720 = obj.source_origin;
-        if (obj.source_1080) obj.source_1080 = obj.source_origin;
+        // 标记信息
+        item.is_pay = true;
+        item.isfree = 1;
+        item.coins = 0;
 
-        // 清除提示
-        if (obj.preview_tip) obj.preview_tip = '已解锁完整版';
-        if (obj.discount) obj.discount = 0;
-        if (obj.origin_coins) obj.origin_coins = 0;
+        // 同步修改其他清晰度（可选，保持一致）
+        if (item.source_240) item.source_240 = targetUrl;
+        if (item.source_480) item.source_480 = targetUrl;
+        if (item.source_720) item.source_720 = targetUrl;
+        if (item.source_1080) item.source_1080 = targetUrl;
+
+        if (item.preview_tip) item.preview_tip = '已解锁完整版';
+        if (item.discount) item.discount = 0;
+        if (item.origin_coins) item.origin_coins = 0;
+
+        console.log('[汤头条] 解锁完成');
     }
-
-    for (const key in obj) {
-        if (obj.hasOwnProperty(key) && typeof obj[key] === 'object' && obj[key] !== null) {
-            obj[key] = unlockVideoObject(obj[key]);
-        }
-    }
-
-    return obj;
 }
 
 /**
@@ -125,31 +141,51 @@ function unlockVideoObject(obj) {
 function processBody(body) {
     try {
         let jsonBody = JSON.parse(body);
+        let dataToProcess = null;
+        let isEncrypted = false;
 
-        // 加密响应
+        // 1. 解析数据
         if (jsonBody.data && typeof jsonBody.data === 'string' && /^[A-Fa-f0-9]+$/.test(jsonBody.data)) {
             console.log('[汤头条] 检测到加密响应');
             const decryptedStr = aesDecrypt(jsonBody.data);
             if (!decryptedStr) return body;
 
-            let decryptedData = JSON.parse(decryptedStr);
-            console.log('[汤头条] 解密成功，执行解锁...');
-            decryptedData = unlockVideoObject(decryptedData);
-
-            const encryptedData = aesEncrypt(JSON.stringify(decryptedData));
-            if (encryptedData) jsonBody.data = encryptedData;
-
-            return JSON.stringify(jsonBody);
-        }
-
-        // 未加密响应
-        if (jsonBody.data && typeof jsonBody.data === 'object') {
+            dataToProcess = JSON.parse(decryptedStr);
+            isEncrypted = true;
+        } else if (jsonBody.data && typeof jsonBody.data === 'object') {
             console.log('[汤头条] 检测到未加密响应');
-            jsonBody.data = unlockVideoObject(jsonBody.data);
-            return JSON.stringify(jsonBody);
+            dataToProcess = jsonBody.data;
+        } else {
+            return body;
         }
 
-        return body;
+        // 2. 定位并处理 detail
+        if (dataToProcess) {
+            // 只处理 data.detail
+            if (dataToProcess.detail && typeof dataToProcess.detail === 'object') {
+                // 如果 detail 是数组（虽然通常是对象），取第一个；如果是对象，直接处理
+                if (Array.isArray(dataToProcess.detail)) {
+                    if (dataToProcess.detail.length > 0) {
+                        processVideoItem(dataToProcess.detail[0]);
+                    }
+                } else {
+                    processVideoItem(dataToProcess.detail);
+                }
+            } else {
+                console.log('[汤头条] 未找到 detail 字段，跳过处理');
+            }
+        }
+
+        // 3. 重新封装/加密
+        if (isEncrypted) {
+            const encryptedData = aesEncrypt(JSON.stringify(dataToProcess));
+            if (encryptedData) jsonBody.data = encryptedData;
+        } else {
+            jsonBody.data = dataToProcess;
+        }
+
+        return JSON.stringify(jsonBody);
+
     } catch (e) {
         console.log('[汤头条] 处理失败:', e);
         return body;
