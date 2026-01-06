@@ -161,18 +161,35 @@ function processBody(body) {
 
         // 2. 定位并处理 detail
         if (dataToProcess) {
-            // 只处理 data.detail
-            if (dataToProcess.detail && typeof dataToProcess.detail === 'object') {
-                // 如果 detail 是数组（虽然通常是对象），取第一个；如果是对象，直接处理
-                if (Array.isArray(dataToProcess.detail)) {
-                    if (dataToProcess.detail.length > 0) {
-                        processVideoItem(dataToProcess.detail[0]);
+            let detailObj = null;
+
+            // 情况 A: detail 在根目录
+            if (dataToProcess.detail) {
+                detailObj = dataToProcess.detail;
+            }
+            // 情况 B: detail 在 data 字段内 (常见于解密后的结构 {"status":200,"data":{"detail":...}})
+            else if (dataToProcess.data && dataToProcess.data.detail) {
+                detailObj = dataToProcess.data.detail;
+            }
+
+            if (detailObj && typeof detailObj === 'object') {
+                // 如果 detail 是数组，取第一个；如果是对象，直接处理
+                if (Array.isArray(detailObj)) {
+                    if (detailObj.length > 0) {
+                        processVideoItem(detailObj[0]);
                     }
                 } else {
-                    processVideoItem(dataToProcess.detail);
+                    processVideoItem(detailObj);
                 }
             } else {
                 console.log('[汤头条] 未找到 detail 字段，跳过处理');
+                // 调试信息：打印键值结构以便排查
+                try {
+                    console.log('Key结构:', JSON.stringify(Object.keys(dataToProcess)));
+                    if (dataToProcess.data) {
+                        console.log('Inner data keys:', JSON.stringify(Object.keys(dataToProcess.data)));
+                    }
+                } catch (e) { }
             }
         }
 
