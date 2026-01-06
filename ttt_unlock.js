@@ -3,13 +3,13 @@
  * 
  * 功能：解锁会员视频和金币视频
  * 原理：通过动态加载 CryptoJS 库，将 preview_video (试看链接) 替换为 source_origin (完整链接)
- * 
  [rewrite_local]
  ^https://api\d*\.armbmmk\.xyz/pwa\.php/api/MvDetail/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/ttt_unlock.js
  * 
  [mitm]
  hostname = api*.armbmmk.xyz, *.armbmmk.xyz
  */
+
 // AES-CFB-256 加解密参数
 const AES_KEY_STR = '7205a6c3883caf95b52db5b534e12ec3';
 const AES_IV_STR = '81d7beac44a86f43';
@@ -80,35 +80,45 @@ function aesEncrypt(plainText) {
  */
 function processVideoItem(item) {
     if (!item || typeof item !== 'object') return;
-    if (!item.source_origin && !item.source_240) return;
+    if (!item.preview_video) return;
 
-    let targetUrl = '';
-    const src240 = item.source_240 || '';
+    try {
+        let url = item.preview_video;
 
-    // 逻辑判断
-    if (src240.includes('play')) {
-        targetUrl = item.source_origin;
-    } else if (src240.includes('videos')) {
-        targetUrl = src240;
-    } else {
-        targetUrl = item.source_origin || item.source_240;
-    }
+        // 1. 替换域名为 long.rpuosv.cn
+        url = url.replace(/^https?:\/\/[^\/]+/, 'https://long.rpuosv.cn');
 
-    if (targetUrl) {
-        item.preview_video = targetUrl;
+        // 2. 移除 seconds 参数
+        if (url.includes('?')) {
+            let [base, query] = url.split('?');
+            let params = query.split('&').filter(p => !p.startsWith('seconds='));
+            url = base;
+            if (params.length > 0) {
+                url += '?' + params.join('&');
+            }
+        }
+
+        // 3. 应用新链接
+        item.preview_video = url;
+        item.source_origin = url; // 同步给完整源
+
+        // 同步修改其他清晰度
+        if (item.source_240) item.source_240 = url;
+        if (item.source_480) item.source_480 = url;
+        if (item.source_720) item.source_720 = url;
+        if (item.source_1080) item.source_1080 = url;
+
+        // 4. 修改状态
         item.is_pay = true;
         item.isfree = 1;
         item.coins = 0;
 
-        // 同步修改其他清晰度
-        if (item.source_240) item.source_240 = targetUrl;
-        if (item.source_480) item.source_480 = targetUrl;
-        if (item.source_720) item.source_720 = targetUrl;
-        if (item.source_1080) item.source_1080 = targetUrl;
-
         if (item.preview_tip) item.preview_tip = '已解锁';
         if (item.discount) item.discount = 0;
         if (item.origin_coins) item.origin_coins = 0;
+
+    } catch (e) {
+        console.log('[汤头条] URL 处理异常');
     }
 }
 
