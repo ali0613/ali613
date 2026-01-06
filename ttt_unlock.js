@@ -4,7 +4,7 @@
  * 功能：解锁会员视频和金币视频
  * 原理：通过动态加载 CryptoJS 库，将 preview_video (试看链接) 替换为 source_origin (完整链接)
  [rewrite_local]
- ^https://api\d*\.armbmmk\.xyz/pwa\.php/api/MvDetail/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/ttt_unlock.js
+ ^https://api\d*\.armbmmk\.xyz/pwa\.php/api/(MvDetail/detail|user/userinfo) url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/ttt_unlock.js
  * 
  [mitm]
  hostname = api*.armbmmk.xyz, *.armbmmk.xyz
@@ -125,6 +125,40 @@ function processVideoItem(item) {
 /**
  * 核心处理逻辑
  */
+// [rewrite_local] 规则更新：
+// ^https://api\d*\.armbmmk\.xyz/pwa\.php/api/(MvDetail/detail|user/userinfo) url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/ttt_unlock.js
+
+/**
+ * 解锁用户信息
+ */
+function unlockUserInfo(data) {
+    if (!data) return;
+
+    // 处理 data.data 结构
+    let userInfo = data.data;
+    if (!userInfo || typeof userInfo !== 'object') return;
+
+    console.log('[汤头条] 处理用户信息...');
+
+    // 基础会员信息
+    userInfo.vip = true;
+    userInfo.coins = 999999;
+    userInfo.is_vip = true; // 可能的字段变体
+
+    // 昵称装饰（可选）
+    // userInfo.nickname = userInfo.nickname + " (已解锁)";
+
+    // 外层字段处理
+    if (data.hasOwnProperty('isVip')) {
+        data.isVip = true;
+    }
+
+    console.log('[汤头条] 用户信息解锁完成');
+}
+
+/**
+ * 核心处理逻辑
+ */
 function processBody(body) {
     try {
         // 尝试初始化环境
@@ -146,19 +180,38 @@ function processBody(body) {
         } else if (jsonBody.data && typeof jsonBody.data === 'object') {
             dataToProcess = jsonBody.data;
         } else {
-            return body;
+            // 有些接口可能直接返回数据，不包 data (虽然少见)
+            dataToProcess = jsonBody;
         }
 
-        // 2. 定位并处理 detail
-        if (dataToProcess) {
-            let detailObj = null;
-            if (dataToProcess.detail) {
-                detailObj = dataToProcess.detail;
-            } else if (dataToProcess.data && dataToProcess.data.detail) {
-                detailObj = dataToProcess.data.detail;
-            }
+        // 2. 根据 URL 分发处理
+        const url = $request ? $request.url : '';
 
-            if (detailObj && typeof detailObj === 'object') {
+        if (url.includes('user/userinfo')) {
+            unlockUserInfo(dataToProcess);
+        } else if (url.includes('MvDetail/detail')) {
+            // 定位并处理 detail
+            if (dataToProcess) {
+                let detailObj = null;
+                if (dataToProcess.detail) {
+                    detailObj = dataToProcess.detail;
+                } else if (dataToProcess.data && dataToProcess.data.detail) {
+                    detailObj = dataToProcess.data.detail;
+                }
+
+                if (detailObj && typeof detailObj === 'object') {
+                    if (Array.isArray(detailObj)) {
+                        if (detailObj.length > 0) processVideoItem(detailObj[0]);
+                    } else {
+                        processVideoItem(detailObj);
+                    }
+                }
+            }
+        } else {
+            // 默认尝试处理视频（兼容旧行为或未知 URL）
+            // 简单检测是否有 detail 字段
+            if (dataToProcess && (dataToProcess.detail || (dataToProcess.data && dataToProcess.data.detail))) {
+                let detailObj = dataToProcess.detail || dataToProcess.data.detail;
                 if (Array.isArray(detailObj)) {
                     if (detailObj.length > 0) processVideoItem(detailObj[0]);
                 } else {
@@ -172,7 +225,7 @@ function processBody(body) {
             const encryptedData = aesEncrypt(JSON.stringify(dataToProcess));
             if (encryptedData) jsonBody.data = encryptedData;
         } else {
-            jsonBody.data = dataToProcess;
+            jsonBody.data = dataToProcess; // 实际上如果是引用修改，这一步可能多余，但为了保险
         }
 
         return JSON.stringify(jsonBody);
