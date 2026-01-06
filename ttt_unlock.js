@@ -88,7 +88,7 @@ function processVideoItem(item) {
     // 逻辑判断
     if (src240.includes('play')) {
         targetUrl = item.source_origin;
-    } else if (src240.includes('videos5')) {
+    } else if (src240.includes('videos')) {
         targetUrl = src240;
     } else {
         targetUrl = item.source_origin || item.source_240;
