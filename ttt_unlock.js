@@ -4,7 +4,7 @@
  * 功能：解锁会员视频和金币视频
  * 原理：通过动态加载 CryptoJS 库，将 preview_video (试看链接) 替换为 source_origin (完整链接)
  [rewrite_local]
- ^https://api\d*\.armbmmk\.xyz/pwa\.php/api/(MvDetail/detail|user/userinfo) url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/ttt_unlock.js
+ ^https://api\d*\.armbmmk\.xyz/pwa\.php/api/(MvDetail/detail|user/userinfo|contents/detail_content|community/post_detail) url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/ttt_unlock.js
  * 
  [mitm]
  hostname = api*.armbmmk.xyz, *.armbmmk.xyz
@@ -157,6 +157,63 @@ function unlockUserInfo(data) {
 }
 
 /**
+ * 解锁黑料板块内容 (contents/detail_content)
+ */
+function unlockBlackContent(data) {
+    if (!data) return;
+
+    // 处理 data.cur 结构
+    let content = data.data && data.data.cur ? data.data.cur : (data.cur || null);
+    if (!content || typeof content !== 'object') return;
+
+    console.log('[汤头条] 处理黑料内容...');
+
+    content.is_pay = 1;
+    content.coins = 0;
+    content.need_vip = 0;
+
+    // 外层字段处理
+    if (data.hasOwnProperty('isVip')) {
+        data.isVip = true;
+    }
+
+    console.log('[汤头条] 黑料内容解锁完成');
+}
+
+/**
+ * 解锁圈子板块帖子 (community/post_detail)
+ */
+function unlockCommunityPost(data) {
+    if (!data) return;
+
+    // 处理 data.data 结构 (帖子内容)
+    let post = data.data;
+    if (!post || typeof post !== 'object') return;
+
+    console.log('[汤头条] 处理圈子帖子...');
+
+    post.is_pay = 1;
+    post.unlock_coins = 0;
+
+    // 处理视频数组 (如果有)
+    if (post.videos && Array.isArray(post.videos)) {
+        post.videos.forEach(video => {
+            if (video.media_url === null && video.cover) {
+                // 视频未解锁时 media_url 为 null
+                // 无法直接获取视频链接，只能标记为已付费
+            }
+        });
+    }
+
+    // 外层字段处理
+    if (data.hasOwnProperty('isVip')) {
+        data.isVip = true;
+    }
+
+    console.log('[汤头条] 圈子帖子解锁完成');
+}
+
+/**
  * 核心处理逻辑
  */
 function processBody(body) {
@@ -189,6 +246,10 @@ function processBody(body) {
 
         if (url.includes('user/userinfo')) {
             unlockUserInfo(dataToProcess);
+        } else if (url.includes('contents/detail_content')) {
+            unlockBlackContent(dataToProcess);
+        } else if (url.includes('community/post_detail')) {
+            unlockCommunityPost(dataToProcess);
         } else if (url.includes('MvDetail/detail')) {
             // 定位并处理 detail
             if (dataToProcess) {
