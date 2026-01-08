@@ -86,7 +86,7 @@ function processVideoItem(item) {
         let url = item.preview_video;
 
         // 1. 替换域名为 long.rpuosv.cn
-        url = url.replace(/^https?:\/\/[^\/]+/, 'https://long.rpuosv.cn');
+        url = url.replace(/^https?:\/\/[^\/]+/, 'https://long.tuyhuv.cn');
 
         // 2. 移除 seconds 参数
         if (url.includes('?')) {
