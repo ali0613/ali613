@@ -80,13 +80,26 @@ function aesEncrypt(plainText) {
  */
 function processVideoItem(item) {
     if (!item || typeof item !== 'object') return;
-    if (!item.preview_video) return;
+    // 必须存在 preview_video 和 source_240 才能进行动态替换
+    if (!item.preview_video || !item.source_240) return;
 
     try {
         let url = item.preview_video;
+        let dynamicDomain = '';
 
-        // 1. 替换域名为 long.rpuosv.cn
-        url = url.replace(/^https?:\/\/[^\/]+/, 'https://long.tuyhuv.cn');
+        // 仅从 source_240 动态获取域名
+        const sourceUrl = item.source_240;
+        if (sourceUrl && typeof sourceUrl === 'string') {
+            const match = sourceUrl.match(/^(https?:\/\/[^\/]+)/);
+            if (match) dynamicDomain = match[1];
+        }
+
+        // 1. 如果获取成功则替换，否则直接返回不处理
+        if (dynamicDomain) {
+            url = url.replace(/^https?:\/\/[^\/]+/, dynamicDomain);
+        } else {
+            return;
+        }
 
         // 2. 移除 seconds 参数
         if (url.includes('?')) {
