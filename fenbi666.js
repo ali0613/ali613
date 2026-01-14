@@ -5,7 +5,8 @@
  * 2. 等待 mediafile/meta 接口原始响应后，用存储的cookie重新请求并替换响应
  * 3. 等待 article/list 接口原始响应后，用存储的cookie重新请求并替换响应
  * 4. 等待 article/summary 接口原始响应后，用存储的cookie重新请求并替换响应
- * 5. 替换 members/my 接口响应为固定权限数据
+ * 5. 等待 api/article/detail 接口原始响应后，用存储的cookie重新请求并替换响应
+ * 6. 替换 members/my 接口响应为固定权限数据
  * 
  * 使用方法：
  [rewrite_local]
@@ -20,6 +21,9 @@
  * 
  * # 响应重写 - article/summary 用新cookie重新请求并替换
  ^https?:\/\/hera-webapp\.fenbi\.com\/iphone\/article\/summary url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi666.js
+ * 
+ * # 响应重写 - api/article/detail 用新cookie重新请求并替换
+ ^https?:\/\/hera-webapp\.fenbi\.com\/api\/article\/detail url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi666.js
  * 
  * # 响应重写 - members/my 固定权限数据
  ^https?:\/\/ke\.fenbi\.com\/iphone\/v3\/members\/my url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/fenbi666.js
@@ -116,6 +120,12 @@ else if (url.includes('hera-webapp.fenbi.com') && url.includes('/article/list') 
 
 // ===== 处理 article/summary 接口响应 =====
 else if (url.includes('hera-webapp.fenbi.com') && url.includes('/article/summary') && typeof $response !== 'undefined') {
+    console.log(`处理类型: Cookie重新请求`);
+    fetchWithSavedCookie(url, $response.body);
+}
+
+// ===== 处理 api/article/detail 接口响应 =====
+else if (url.includes('hera-webapp.fenbi.com') && url.includes('/api/article/detail') && typeof $response !== 'undefined') {
     console.log(`处理类型: Cookie重新请求`);
     fetchWithSavedCookie(url, $response.body);
 }
