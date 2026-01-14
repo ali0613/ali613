@@ -7,7 +7,7 @@
  * 4. 等待 article/summary 接口原始响应后，用存储的cookie重新请求并替换响应
  * 5. 等待 api/article/detail 接口原始响应后，用存储的cookie重新请求并替换响应
  * 6. 替换 members/my 接口响应为固定权限数据
- * 7. 修改 get_home_banners 接口响应，在首页模块最前面添加热点晨读入口
+ * 7. 修改 get_home_banners 接口响应，将首页模块会员中心修改为热点晨读
  * 
  * 使用方法：
  [rewrite_local]
@@ -149,27 +149,22 @@ else if (url.includes('/get_home_banners') && typeof $response !== 'undefined') 
     try {
         let data = JSON.parse($response.body);
 
-        // 构造热点晨读项目
-        const hotReadItem = {
-            "id": 99999,
-            "style": "default",
-            "priority": 99999,
-            "backgroundImage": "http://nodestatic.fbstatic.cn/popup/a7d73c09049339dab563be03abfd3dbb_350_146.png",
-            "backgroundAnimationImage": "",
-            "mainTitle": "热点晨读",
-            "subTitle": "每日07:30更新",
-            "color": "#FF4D4E",
-            "link": "/member/article/list?memberTypes=[2]&displayLoc=2",
-            "linkType": 1,
-            "bizType": 0
-        };
-
-        // 在 items 数组最前面插入热点晨读
+        // 查找并修改会员中心项目为热点晨读
         if (data.data && data.data.payload && data.data.payload.items) {
-            data.data.payload.items.unshift(hotReadItem);
-            console.log(`已在首页模块最前面添加热点晨读\n`);
+            const items = data.data.payload.items;
+            const memberCenterIndex = items.findIndex(item => item.id === 809 || item.mainTitle === "会员中心");
+
+            if (memberCenterIndex !== -1) {
+                // 修改会员中心为热点晨读
+                items[memberCenterIndex].mainTitle = "热点晨读";
+                items[memberCenterIndex].subTitle = "每日07:30更新";
+                items[memberCenterIndex].link = "/member/article/list?memberTypes=[2]&displayLoc=2";
+                console.log(`已将会员中心修改为热点晨读\n`);
+            } else {
+                console.log(`未找到会员中心项目\n`);
+            }
         } else {
-            console.log(`首页模块数据结构异常，无法添加\n`);
+            console.log(`首页模块数据结构异常\n`);
         }
 
         $done({ body: JSON.stringify(data) });
