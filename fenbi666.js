@@ -7,7 +7,7 @@
  * 4. 等待 article/summary 接口原始响应后，用存储的cookie重新请求并替换响应
  * 5. 等待 api/article/detail 接口原始响应后，用存储的cookie重新请求并替换响应
  * 6. 替换 members/my 接口响应为固定权限数据
- * 7. 修改 get_home_banners 接口响应，将首页模块会员中心修改为热点晨读
+ * 7. 修改 get_home_banners 接口响应，将首页模块会员中心修改为热点晨读并只保留此项目
  * 
  * 使用方法：
  [rewrite_local]
@@ -149,17 +149,19 @@ else if (url.includes('/get_home_banners') && typeof $response !== 'undefined') 
     try {
         let data = JSON.parse($response.body);
 
-        // 查找并修改会员中心项目为热点晨读
+        // 查找并修改会员中心项目为热点晨读，只保留此项目
         if (data.data && data.data.payload && data.data.payload.items) {
             const items = data.data.payload.items;
-            const memberCenterIndex = items.findIndex(item => item.id === 809 || item.mainTitle === "会员中心");
+            const memberCenterItem = items.find(item => item.id === 809 || item.mainTitle === "会员中心");
 
-            if (memberCenterIndex !== -1) {
+            if (memberCenterItem) {
                 // 修改会员中心为热点晨读
-                items[memberCenterIndex].mainTitle = "热点晨读";
-                items[memberCenterIndex].subTitle = "每日07:30更新";
-                items[memberCenterIndex].link = "/member/article/list?memberTypes=[2]&displayLoc=2";
-                console.log(`已将会员中心修改为热点晨读\n`);
+                memberCenterItem.mainTitle = "热点晨读";
+                memberCenterItem.subTitle = "每日07:30更新";
+                memberCenterItem.link = "/member/article/list?memberTypes=[2]&displayLoc=2";
+                // 只保留此项目
+                data.data.payload.items = [memberCenterItem];
+                console.log(`已将会员中心修改为热点晨读，并只保留此项目\n`);
             } else {
                 console.log(`未找到会员中心项目\n`);
             }
