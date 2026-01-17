@@ -4,11 +4,11 @@
  * 功能：修改购买请求中的 money 为 0
  * 原理：动态加载 CryptoJS 库，解密/加密请求体中的 data 字段
  * 
- * [rewrite_local]
- * ^http://104\.233\.223\.2:7781/api/buy url script-request-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/chxb.js
+ [rewrite_local]
+ ^http://104\.233\.223\.2:7781/api/buy url script-request-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/chxb.js
  * 
- * [mitm]
- * hostname = 104.233.223.2
+ [mitm]
+ hostname = 104.233.223.2
  */
 
 // AES-CBC-PKCS7 加解密参数
