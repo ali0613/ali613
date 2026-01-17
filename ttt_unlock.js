@@ -4,10 +4,10 @@
  * 功能：解锁会员视频和金币视频
  * 原理：通过动态加载 CryptoJS 库，将 preview_video (试看链接) 替换为 source_origin (完整链接)
  [rewrite_local]
- ^https://api\d*\.armbmmk\.xyz/pwa\.php/api/(MvDetail/detail|user/userinfo|contents/detail_content|community/post_detail) url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/ttt_unlock.js
+ ^https://api\d*\.bymfwxg\.cc/pwa\.php/api/(MvDetail/detail|user/userinfo|contents/detail_content|community/post_detail) url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/ttt_unlock.js
  * 
  [mitm]
- hostname = api*.armbmmk.xyz, *.armbmmk.xyz
+ hostname = api*.bymfwxg.cc, *.bymfwxg.cc
  */
 
 // AES-CFB-256 加解密参数
@@ -135,11 +135,6 @@ function processVideoItem(item) {
     }
 }
 
-/**
- * 核心处理逻辑
- */
-// [rewrite_local] 规则更新：
-// ^https://api\d*\.armbmmk\.xyz/pwa\.php/api/(MvDetail/detail|user/userinfo) url script-response-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/ttt_unlock.js
 
 /**
  * 解锁用户信息
@@ -159,7 +154,7 @@ function unlockUserInfo(data) {
     userInfo.is_vip = true; // 可能的字段变体
 
     // 昵称装饰（可选）
-    // userInfo.nickname = userInfo.nickname + " (已解锁)";
+    userInfo.nickname = userInfo.nickname + " (已解锁)";
 
     // 外层字段处理
     if (data.hasOwnProperty('isVip')) {
