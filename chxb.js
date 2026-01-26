@@ -5,10 +5,10 @@
  * 原理：动态加载 CryptoJS 库，解密/加密请求体中的 data 字段
  * 
  [rewrite_local]
- ^http://104\.233\.223\.2:7781/api/buy url script-request-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/chxb.js
+ ^http://104\.233\.183\.161:7781/api/buy url script-request-body https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/chxb.js
  * 
  [mitm]
- hostname = 104.233.223.2
+ hostname = 104.233.183.161
  */
 
 // AES-CBC-PKCS7 加解密参数
