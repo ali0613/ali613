@@ -1,14 +1,14 @@
 #!name=兜夹 Token 自动切换
-#!desc=Panel 小组件 + Token 注入；从环境变量 DOUJIA_ACCOUNTS 读取账号，选择 free_times > 0 的账号并保存 access-token。
+#!desc=Panel 小组件 + Token 注入；只从模块参数 accounts 读取账号，选择 free_times > 0 的账号并保存 access-token。
 #!category=兜夹
 #!author=Cline
 #!arguments=panel:兜夹Token切换面板,accounts:#
-#!arguments-desc=panel\n\n自定义 Egern 小组件/Panel 名称\n若设为 # 可取消面板\n\naccounts\n\n可选：通过模块参数传入账号，优先建议使用 Egern 环境变量 DOUJIA_ACCOUNTS\nJSON 示例：[{"phone":"13800138000","password":"password"}]\n若设为 # 则不通过模块参数传入账号
+#!arguments-desc=panel\n\n自定义 Egern 小组件/Panel 名称\n若设为 # 可取消面板\n\naccounts\n\n必填：通过模块参数传入账号，脚本只读取此参数\n推荐多账号格式：13800138000#密码|13900139000#密码\n也支持 URL 编码后的 JSON 数组\n若为 # 则视为未配置账号
 
 [Script]
-# 账号密码不写入脚本：请在 Egern 环境变量中配置 DOUJIA_ACCOUNTS，或在模块参数 accounts 中填写。
-# 支持 JSON 数组：[{"phone":"13800138000","password":"password"}]
-# 支持多行文本：13800138000#password
+# 账号密码不写入脚本：请在模块参数 accounts 中填写。
+# 推荐多账号格式：13800138000#password|13900139000#password
+# 也支持 URL 编码后的 JSON 数组。
 
 # 1) 请求头改写：访问兜夹接口时自动添加/替换 access-token。
 兜夹 Token 注入 = type=http-request, pattern=^https?:\/\/userapi\.cczhua\.com\/, requires-body=0, script-path=https://raw.githubusercontent.com/ali0613/ali613/refs/heads/main/doujia_token_switch_egern.js, timeout=30
