@@ -92,15 +92,24 @@ function getRuntimeValue(key) {
     if (argumentText) {
       const matched = argumentText.match(new RegExp(`(?:^|[&;\\n])${key}=([^&;\\n]+)`, 'i'));
       if (matched && matched[1]) {
-        try {
-          return decodeURIComponent(matched[1]);
-        } catch (e) {
-          return matched[1];
+        const value = String(matched[1]).trim();
+        // 模块参数 accounts 默认是 #，表示“不通过模块参数传账号”；此时继续读取 Egern 环境变量。
+        if (value && value !== '#') {
+          try {
+            return decodeURIComponent(value);
+          } catch (e) {
+            return value;
+          }
         }
-      }
-      // 如果脚本参数本身就是 JSON 或多行账号文本，也直接作为账号配置使用。
-      if (/^\s*[\[{]/.test(argumentText) || /[#|=,\n]/.test(argumentText)) {
-        return argumentText;
+      } else if (!/[&=]/.test(argumentText)) {
+        // 只有在“整个参数”明显就是账号配置时，才把 $argument 当账号使用。
+        // 不能把 panel=1&icon=...&icon-color=#18a058 这类小组件参数误判为“手机号#密码”。
+        const looksLikeJsonAccounts = /^\s*[\[{]/.test(argumentText);
+        const looksLikeMultilineAccounts = /\n/.test(argumentText);
+        const looksLikeSingleAccount = /^[^#|=,&\s]+[#|,][^#|=,&\s]+$/.test(argumentText);
+        if (looksLikeJsonAccounts || looksLikeMultilineAccounts || looksLikeSingleAccount) {
+          return argumentText;
+        }
       }
     }
   }
@@ -151,6 +160,10 @@ function parseAccountsFromText(raw) {
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
+      // 忽略小组件/脚本控制参数，避免 panel=1&icon=... 被当作账号。
+      if (/^(panel|icon|icon-color|iconColor|color|title|content|message)=/i.test(line) || line.includes('&')) {
+        return null;
+      }
       const separator = ['#', '|', '=', ','].find((item) => line.includes(item));
       if (!separator) return null;
       const index = line.indexOf(separator);
