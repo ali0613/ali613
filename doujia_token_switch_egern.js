@@ -11,24 +11,25 @@
  * - doujia_token_switch_egern.sgmodule  Egern 模块
  * - doujia_token_switch_egern.js        Egern 脚本
  *
- * 账号模块参数：
- * - 参数名：accounts
- * - 推荐多账号格式：13800138000#password|13900139000#password
- * - 也支持 URL 编码后的 JSON 数组。
+ * 账号环境变量：
+ * - 变量名：DOUJIA_ACCOUNTS
+ * - 推荐格式：13800138000#password|13900139000#password
+ * - 也支持 JSON 数组、JSON 对象、多行文本。
  *
  * 使用方式：
  * - 将本脚本与模块放在 Egern 可访问的位置；如果通过远程订阅导入模块，请把模块里的脚本路径改成脚本真实 URL。
- * - 在 Egern 模块参数 accounts 中配置账号，脚本只读取模块参数，不读取环境变量/持久化账密。
+ * - 在 Egern 环境变量 DOUJIA_ACCOUNTS 中配置账号，脚本只读取环境变量，不从模块参数读取账密。
  * - 在 Egern 中启用模块，并允许 MITM userapi.cczhua.com。
  * - 在 Egern 小组件/通用脚本中执行“兜夹 Token 切换小组件”，提示“已替换 Token”后再打开兜夹。
  */
 
-// ==================== 模块参数配置区 ====================
-// 请在 Egern 模块参数 accounts 中配置账号，脚本内不保存账密。
+// ==================== 环境变量配置区 ====================
+// 请在 Egern 环境变量 DOUJIA_ACCOUNTS 中配置账号，脚本内不保存账密。
 // 支持格式：
 // 1) 推荐多账号：13800138000#password|13900139000#password
-// 2) URL 编码后的 JSON 数组：%5B%7B%22phone%22%3A%2213800138000%22%2C%22password%22%3A%22password%22%7D%5D
-// 3) JSON 对象/多行文本也可解析，但远程模块参数中建议 URL 编码。
+// 2) JSON 数组：[{"phone":"13800138000","password":"password"}]
+// 3) JSON 对象：{"13800138000":"password","13900139000":"password"}
+// 4) 多行文本：13800138000#password
 const ACCOUNTS_ENV_KEY = 'DOUJIA_ACCOUNTS';
 // ==================== 配置区结束 ====================
 
@@ -85,32 +86,24 @@ function writeStore(key, value) {
   return false;
 }
 
-function getModuleArgumentValue(key) {
-  // 只从模块参数/脚本参数读取账号，避免不同入口的环境变量行为不一致。
-  // 推荐模块参数：accounts=手机号#密码|手机号#密码
-  // 实际传给脚本：DOUJIA_ACCOUNTS={{{accounts}}}
-  if (typeof $argument !== 'undefined' && $argument !== null) {
-    const argumentText = String($argument).trim();
-    if (argumentText) {
-      const matched = argumentText.match(new RegExp(`(?:^|[&;\\n])${key}=([\\s\\S]*?)(?:[&;\\n][A-Za-z0-9_-]+=|$)`, 'i'));
-      if (matched && matched[1]) {
-        const value = decodeText(String(matched[1]).trim());
-        if (value && value !== '#') {
-          return value;
-        }
-      } else if (!/[&=]/.test(argumentText) && argumentText !== '#') {
-        // 兼容直接把账号文本作为脚本参数的情况。
-        const looksLikeJsonAccounts = /^\s*[\[{]/.test(argumentText);
-        const looksLikeMultilineAccounts = /\n/.test(argumentText);
-        const looksLikeTextAccounts = /[#|,]/.test(argumentText);
-        if (looksLikeJsonAccounts || looksLikeMultilineAccounts || looksLikeTextAccounts) {
-          return decodeText(argumentText);
-        }
-      }
+function readAccountEnv() {
+  // 只读取环境变量/环境对象，不从模块参数读取账密，避免模板参数截断导致只读第一个账号。
+  const envObjects = [];
+  if (typeof $environment !== 'undefined' && $environment) envObjects.push($environment);
+  if (typeof $env !== 'undefined' && $env) envObjects.push($env);
+  if (typeof $argument !== 'undefined' && $argument && typeof $argument === 'object') envObjects.push($argument);
+  if (typeof process !== 'undefined' && process && process.env) envObjects.push(process.env);
+  if (typeof globalThis !== 'undefined' && globalThis) envObjects.push(globalThis);
+
+  for (const env of envObjects) {
+    if (Object.prototype.hasOwnProperty.call(env, ACCOUNTS_ENV_KEY) && env[ACCOUNTS_ENV_KEY] !== undefined && env[ACCOUNTS_ENV_KEY] !== null) {
+      const value = decodeText(env[ACCOUNTS_ENV_KEY]);
+      if (value && value !== '#') return value;
     }
   }
 
-  return '';
+  const stored = readStore(ACCOUNTS_ENV_KEY);
+  return stored ? decodeText(stored) : '';
 }
 
 function decodeText(text) {
@@ -187,8 +180,8 @@ function normalizeAccountText(text) {
   return source;
 }
 
-function getAccountsFromModuleArgument() {
-  const raw = getModuleArgumentValue(ACCOUNTS_ENV_KEY).trim();
+function getAccountsFromEnv() {
+  const raw = readAccountEnv().trim();
   if (!raw) return [];
 
   let accounts = [];
@@ -198,6 +191,10 @@ function getAccountsFromModuleArgument() {
     accounts = parseAccountsFromText(raw);
   }
 
+  return uniqueAccounts(accounts);
+}
+
+function uniqueAccounts(accounts) {
   const seen = {};
   return accounts.filter((item) => {
     if (!item.phone || !item.password || seen[item.phone]) return false;
@@ -386,13 +383,13 @@ function saveCurrentToken(phone, token, freeTimes) {
 }
 
 async function chooseAndSaveToken() {
-  const accounts = getAccountsFromModuleArgument();
+  const accounts = getAccountsFromEnv();
   if (!accounts.length) {
     const status = {
       ok: false,
       title: SCRIPT_NAME,
-      subtitle: '未配置账号模块参数',
-      message: '请在 Egern 模块参数 accounts 中配置账号\n推荐格式：手机号#密码|手机号#密码',
+      subtitle: '未配置账号环境变量',
+      message: `请在 Egern 环境变量 ${ACCOUNTS_ENV_KEY} 中配置账号\n推荐格式：手机号#密码|手机号#密码`,
     };
     notify(status.title, status.subtitle, status.message);
     finishWidget(status);
